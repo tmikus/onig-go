@@ -89,8 +89,20 @@ func (r *Regex) CaptureNames() []string {
 }
 
 // Captures returns the capture groups corresponding to the leftmost-first match in text. Capture group 0 always corresponds to the entire match. If no match is found, then None is returned.
-func (r *Regex) Captures(text string) Captures {
-	panic("not implemented")
+func (r *Regex) Captures(text string) (*Captures, error) {
+	region := NewRegion()
+	match, err := r.SearchWithParam(text, 0, uint(len(text)), REGEX_OPTION_NONE, region, NewMatchParam())
+	if err != nil {
+		return nil, err
+	}
+	if match == nil {
+		return nil, nil
+	}
+	return &Captures{
+		Offset: *match,
+		Region: region,
+		Text:   text,
+	}, nil
 }
 
 // FindMatches returns a list containing each non-overlapping match in text, returning the start and end byte indices with respect to text.

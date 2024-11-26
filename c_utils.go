@@ -20,6 +20,11 @@ func getPointer[T any](s *T) uintptr {
 	return uintptr(unsafe.Pointer(s))
 }
 
+func offsetInt(i *C.int, offset int) C.int {
+	//return C.int(unsafe.Pointer(uintptr(unsafe.Pointer(i)) + uintptr(offset)))
+	return *(*C.int)(unsafe.Pointer(uintptr(unsafe.Pointer(i)) + uintptr(offset)*unsafe.Sizeof(C.int(0))))
+}
+
 func offsetUChar(s *C.UChar, offset int) *C.UChar {
 	return (*C.UChar)(unsafe.Pointer(uintptr(unsafe.Pointer(s)) + uintptr(offset)))
 }

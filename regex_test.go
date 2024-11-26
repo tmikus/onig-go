@@ -11,7 +11,7 @@ func TestNewRegex(t *testing.T) {
 	assert.NotNil(t, regex)
 }
 
-func TestNewRegexCaptureNames_DefaultSyntax(t *testing.T) {
+func TestRegex_CaptureNames_DefaultSyntax(t *testing.T) {
 	regex, err := NewRegex("(he)(l+)(o)")
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
@@ -28,7 +28,7 @@ func TestNewRegexCaptureNames_DefaultSyntax(t *testing.T) {
 	assert.Equal(t, []string{"foo", "bar"}, regex.CaptureNames())
 }
 
-func TestNewRegexCaptureNames_PythonSyntax(t *testing.T) {
+func TestRegex_CaptureNames_PythonSyntax(t *testing.T) {
 	regex, err := NewRegexWithOptions("(he)(l+)(o)", REGEX_OPTION_NONE, SyntaxPython)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
@@ -43,4 +43,21 @@ func TestNewRegexCaptureNames_PythonSyntax(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	assert.Equal(t, []string{"foo", "bar"}, regex.CaptureNames())
+}
+
+func TestRegex_Captures(t *testing.T) {
+	regex, err := NewRegex("e(l+)|(r+)")
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	captures, err := regex.Captures("hello")
+	assert.NoError(t, err)
+	assert.NotNil(t, captures)
+	assert.Equal(t, 3, captures.Len())
+	assert.Equal(t, false, captures.IsEmpty())
+	assert.Equal(t, NewRange(1, 4), captures.Pos(0))
+	assert.Equal(t, NewRange(2, 4), captures.Pos(1))
+	assert.Nil(t, captures.Pos(2))
+	assert.Equal(t, "ell", captures.At(0))
+	assert.Equal(t, "ll", captures.At(1))
+	assert.Equal(t, "", captures.At(2))
 }
