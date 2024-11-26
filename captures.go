@@ -6,6 +6,22 @@ type Captures struct {
 	Text   string
 }
 
+func (c *Captures) All() []string {
+	result := make([]string, c.Len())
+	for i := 0; i < c.Len(); i++ {
+		result[i] = c.At(i)
+	}
+	return result
+}
+
+func (c *Captures) AllPos() []*Range {
+	result := make([]*Range, c.Len())
+	for i := 0; i < c.Len(); i++ {
+		result[i] = c.Pos(i)
+	}
+	return result
+}
+
 func (c *Captures) At(i int) string {
 	r := c.Pos(i)
 	if r == nil {
