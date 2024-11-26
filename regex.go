@@ -1,8 +1,8 @@
 package onig
 
 /*
-#cgo CFLAGS: -I/opt/homebrew/include
-#cgo LDFLAGS: -L/opt/homebrew/lib -lonig
+#cgo CFLAGS: -I/opt/homebrew/include -I/usr/local/include
+#cgo LDFLAGS: -L/opt/homebrew/lib -L/usr/local/lib -lonig
 
 #include "regex.h"
 
