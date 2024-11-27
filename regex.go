@@ -30,17 +30,35 @@ func goOnigForeachNameCallback(
 	return 0
 }
 
+// ReplacementFunc is a function that takes the matches Captures and returns the replaced string.
 type ReplacementFunc func(capture *Captures) string
 
+// Regex represents a regular expression.
+// It is a wrapper around the Oniguruma regex library.
 type Regex struct {
 	raw C.OnigRegex
 }
 
+// NewRegex creates a new Regex object.
 func NewRegex(pattern string) (*Regex, error) {
-	return NewRegexWithOptions(pattern, REGEX_OPTION_NONE, SyntaxDefault)
+	return NewRegexWithOptionsAndSyntax(pattern, REGEX_OPTION_NONE, SyntaxDefault)
 }
 
+// NewRegexWithOptions creates a new Regex object with the given options.
 func NewRegexWithOptions(
+	pattern string,
+	options RegexOptions,
+) (*Regex, error) {
+	return NewRegexWithOptionsAndSyntax(pattern, options, SyntaxDefault)
+}
+
+// NewRegexWithSyntax creates a new Regex object with the given syntax.
+func NewRegexWithSyntax(pattern string, syntax *Syntax) (*Regex, error) {
+	return NewRegexWithOptionsAndSyntax(pattern, REGEX_OPTION_NONE, syntax)
+}
+
+// NewRegexWithOptionsAndSyntax creates a new Regex object with the given options and syntax.
+func NewRegexWithOptionsAndSyntax(
 	pattern string,
 	options RegexOptions,
 	syntax *Syntax,
@@ -206,6 +224,158 @@ func (r *Regex) FindMatches(text string) ([]*Range, error) {
 		matches = append(matches, pos)
 	}
 	return matches, nil
+}
+
+// MustAllCaptures returns a list of all non-overlapping capture groups matched in text.
+// This is operationally the same as FindMatches, except it yields information about submatches.
+// Compared to AllCaptures, this method panics on error.
+func (r *Regex) MustAllCaptures(text string) []Captures {
+	captures, err := r.AllCaptures(text)
+	if err != nil {
+		panic(err)
+	}
+	return captures
+}
+
+// MustCaptures returns the capture groups corresponding to the leftmost-first match in text.
+// Capture group 0 always corresponds to the entire match. If no match is found, then nil is returned.
+// Compared to Captures, this method panics on error.
+func (r *Regex) MustCaptures(text string) *Captures {
+	captures, err := r.Captures(text)
+	if err != nil {
+		panic(err)
+	}
+	return captures
+}
+
+// MustFindMatches returns a list containing each non-overlapping match in text,
+// returning the start and end byte indices with respect to text.
+// Compared to FindMatches, this method panics on error.
+func (r *Regex) MustFindMatches(text string) []*Range {
+	matches, err := r.FindMatches(text)
+	if err != nil {
+		panic(err)
+	}
+	return matches
+}
+
+// MustReplace replaces the leftmost-first match with the replacement provided.
+// If no match is found, then a copy of the string is returned unchanged.
+// Compared to Replace, this method panics on error.
+func (r *Regex) MustReplace(text string, replacement string) string {
+	result, err := r.Replace(text, replacement)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+// MustReplaceAll replaces all non-overlapping matches in text with the replacement provided.
+// This is the same as calling ReplaceN with limit set to 0.
+// See the documentation for Replace for details on how to access submatches in the replacement string.
+// Compared to ReplaceAll, this method panics on error.
+func (r *Regex) MustReplaceAll(text string, replacement string) string {
+	result, err := r.ReplaceAll(text, replacement)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+// MustReplaceAllFunc replaces all non-overlapping matches in text with the replacement function provided.
+// This is the same as calling ReplaceNFunc with limit set to 0.
+// See the documentation for Replace for details on how to access submatches in the replacement string.
+// Compared to ReplaceAllFunc, this method panics on error.
+func (r *Regex) MustReplaceAllFunc(text string, replacement ReplacementFunc) string {
+	result, err := r.ReplaceAllFunc(text, replacement)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+// MustReplaceFunc replaces the leftmost-first match with the replacement provided.
+// The replacement is a function that takes the matches Captures and returns the replaced string.
+// If no match is found, then a copy of the string is returned unchanged.
+// Compared to ReplaceFunc, this method panics on error.
+func (r *Regex) MustReplaceFunc(text string, replacement ReplacementFunc) string {
+	result, err := r.ReplaceFunc(text, replacement)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+// MustReplaceN replaces at most limit non-overlapping matches in text with the replacement provided.
+// If limit is 0, then all non-overlapping matches are replaced.
+// See the documentation for Replace for details on how to access submatches in the replacement string.
+// Compared to ReplaceN, this method panics on error.
+func (r *Regex) MustReplaceN(text string, replacement string, limit int) string {
+	result, err := r.ReplaceN(text, replacement, limit)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+// MustReplaceNFunc replaces at most limit non-overlapping matches in text with the replacement provided.
+// If limit is 0, then all non-overlapping matches are replaced.
+// See the documentation for Replace for details on how to access submatches in the replacement string.
+// Compared to ReplaceNFunc, this method panics on error.
+func (r *Regex) MustReplaceNFunc(text string, replacement ReplacementFunc, limit int) string {
+	result, err := r.ReplaceNFunc(text, replacement, limit)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+// MustSearchWithParam searches pattern in string with match param.
+//
+// Search for matches the regex in a string. This method will return the index of the first match of the regex within the string,
+// if there is one. If from is less than to, then search is performed in forward order, otherwise – in backward order.
+//
+// For more information see [Match vs Search](https://docs.rs/onig/latest/onig/index.html#match-vs-search)
+//
+// The encoding of the buffer passed to search in must match the encoding of the regex.
+// Compared to SearchWithParam, this method panics on error.
+func (r *Regex) MustSearchWithParam(
+	text string,
+	from uint,
+	to uint,
+	options RegexOptions,
+	region *Region,
+	matchParam *MatchParam,
+) *uint {
+	result, err := r.SearchWithParam(text, from, to, options, region, matchParam)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+// MustSplit returns a list of substrings of text delimited by a match of the regular expression.
+// Namely, each element of the iterator corresponds to text that isn’t matched by the regular expression.
+// Compared to Split, this method panics on error.
+func (r *Regex) MustSplit(text string) []string {
+	splits, err := r.Split(text)
+	if err != nil {
+		panic(err)
+	}
+	return splits
+}
+
+// MustSplitN returns a list of at most `limit` substrings of text delimited by a match of the regular expression.
+// A limit of 0 will return no substrings.
+// Namely, each element of the iterator corresponds to text that isn’t matched by the regular expression.
+// The remainder of the string that is not split will be the last element in the iterator.
+// Compared to SplitN, this method panics on error.
+func (r *Regex) MustSplitN(text string, limit int) []string {
+	splits, err := r.SplitN(text, limit)
+	if err != nil {
+		panic(err)
+	}
+	return splits
 }
 
 // Replace replaces the leftmost-first match with the replacement provided.

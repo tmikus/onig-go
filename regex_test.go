@@ -41,17 +41,17 @@ func TestRegex_CaptureNames_DefaultSyntax(t *testing.T) {
 }
 
 func TestRegex_CaptureNames_PythonSyntax(t *testing.T) {
-	regex, err := NewRegexWithOptions("(he)(l+)(o)", REGEX_OPTION_NONE, SyntaxPython)
+	regex, err := NewRegexWithSyntax("(he)(l+)(o)", SyntaxPython)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	assert.Nil(t, regex.CaptureNames())
 
-	regex, err = NewRegexWithOptions("(?P<foo>foo)", REGEX_OPTION_NONE, SyntaxPython)
+	regex, err = NewRegexWithSyntax("(?P<foo>foo)", SyntaxPython)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	assert.Equal(t, []string{"foo"}, regex.CaptureNames())
 
-	regex, err = NewRegexWithOptions("(?P<foo>foo)(?P<bar>bar)", REGEX_OPTION_NONE, SyntaxPython)
+	regex, err = NewRegexWithSyntax("(?P<foo>foo)(?P<bar>bar)", SyntaxPython)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	assert.Equal(t, []string{"foo", "bar"}, regex.CaptureNames())
