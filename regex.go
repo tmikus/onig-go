@@ -319,13 +319,44 @@ func (r *Regex) SearchWithParam(
 }
 
 // Split returns a list of substrings of text delimited by a match of the regular expression. Namely, each element of the iterator corresponds to text that isn’t matched by the regular expression.
-func (r *Regex) Split(text string) []string {
+func (r *Regex) Split(text string) ([]string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.split
-	panic("not implemented")
+	matches, err := r.FindMatches(text)
+	if err != nil {
+		return nil, err
+	}
+	splits := make([]string, 0)
+	last := 0
+	for _, match := range matches {
+		matched := text[last:match.From]
+		last = match.To
+		splits = append(splits, matched)
+	}
+	if last < len(text) {
+		splits = append(splits, text[last:])
+	}
+	return splits, nil
 }
 
 // SplitN returns a list of at most `limit` substrings of text delimited by a match of the regular expression. (A limit of 0 will return no substrings.) Namely, each element of the iterator corresponds to text that isn’t matched by the regular expression. The remainder of the string that is not split will be the last element in the iterator.
-func (r *Regex) SplitN(text string, limit int) []string {
+func (r *Regex) SplitN(text string, limit int) ([]string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.splitn
-	panic("not implemented")
+	matches, err := r.FindMatches(text)
+	if err != nil {
+		return nil, err
+	}
+	splits := make([]string, 0)
+	last := 0
+	for i, match := range matches {
+		if i >= limit-1 {
+			break
+		}
+		matched := text[last:match.From]
+		last = match.To
+		splits = append(splits, matched)
+	}
+	if last < len(text) {
+		splits = append(splits, text[last:])
+	}
+	return splits, nil
 }

@@ -199,3 +199,21 @@ func TestRegex_ReplaceAllFunc(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "A12B2", replaced)
 }
+
+func TestRegex_Split(t *testing.T) {
+	regex, err := NewRegex(`[ \t]+`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	splits, err := regex.Split("a b \t  c\td    e")
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"a", "b", "c", "d", "e"}, splits)
+}
+
+func TestRegex_SplitN(t *testing.T) {
+	regex, err := NewRegex(`\W+`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	splits, err := regex.SplitN("Hey! How are you?", 3)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"Hey", "How", "are you?"}, splits)
+}
