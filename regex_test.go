@@ -11,6 +11,17 @@ func TestNewRegex(t *testing.T) {
 	assert.NotNil(t, regex)
 }
 
+func TestRegex_AllCaptures(t *testing.T) {
+	regex, err := NewRegex(`\d+`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	captures, err := regex.AllCaptures("a12b2")
+	assert.NoError(t, err)
+	assert.Len(t, captures, 2)
+	assert.Equal(t, NewRange(1, 3), captures[0].Pos(0))
+	assert.Equal(t, NewRange(4, 5), captures[1].Pos(0))
+}
+
 func TestRegex_CaptureNames_DefaultSyntax(t *testing.T) {
 	regex, err := NewRegex("(he)(l+)(o)")
 	assert.NoError(t, err)
