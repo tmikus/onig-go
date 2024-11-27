@@ -30,6 +30,8 @@ func goOnigForeachNameCallback(
 	return 0
 }
 
+type ReplacementFunc func(capture *Captures) string
+
 type Regex struct {
 	raw C.OnigRegex
 }
@@ -204,44 +206,63 @@ func (r *Regex) FindMatches(text string) ([]*Range, error) {
 }
 
 // Replace replaces the leftmost-first match with the replacement provided. If no match is found, then a copy of the string is returned unchanged.
-func (r *Regex) Replace(text string, replacement string) string {
+func (r *Regex) Replace(text string, replacement string) (string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.replace
-	panic("not implemented")
+	return r.ReplaceN(text, replacement, 1)
 }
 
 // ReplaceAll replaces all non-overlapping matches in text with the replacement provided. This is the same as calling replacen with limit set to 0.
 // See the documentation for replace for details on how to access submatches in the replacement string.
-func (r *Regex) ReplaceAll(text string, replacement string) string {
+func (r *Regex) ReplaceAll(text string, replacement string) (string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.replace_all
-	panic("not implemented")
+	return r.ReplaceN(text, replacement, 0)
 }
 
 // ReplaceAllFunc replaces all non-overlapping matches in text with the replacement function provided. This is the same as calling replacen with limit set to 0.
 // See the documentation for replace for details on how to access submatches in the replacement string.
-func (r *Regex) ReplaceAllFunc(text string, replacement string) string {
+func (r *Regex) ReplaceAllFunc(text string, replacement ReplacementFunc) (string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.replace_all
-	panic("not implemented")
+	return r.ReplaceNFunc(text, replacement, 0)
 }
 
 // ReplaceFunc replaces the leftmost-first match with the replacement provided. The replacement is a function that takes the matches Captures and returns the replaced string.
 // If no match is found, then a copy of the string is returned unchanged.
-func (r *Regex) ReplaceFunc(text string, replacement func(capture *Captures) string) string {
+func (r *Regex) ReplaceFunc(text string, replacement ReplacementFunc) (string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.replace
-	panic("not implemented")
+	return r.ReplaceNFunc(text, replacement, 1)
 }
 
 // ReplaceN replaces at most limit non-overlapping matches in text with the replacement provided. If limit is 0, then all non-overlapping matches are replaced.
 // See the documentation for replace for details on how to access submatches in the replacement string.
-func (r *Regex) ReplaceN(text string, replacement string, limit int) string {
+func (r *Regex) ReplaceN(text string, replacement string, limit int) (string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.replacen
-	panic("not implemented")
+	return r.ReplaceNFunc(text, func(_ *Captures) string { return replacement }, limit)
 }
 
 // ReplaceNFunc replaces at most limit non-overlapping matches in text with the replacement provided. If limit is 0, then all non-overlapping matches are replaced.
 // See the documentation for replace for details on how to access submatches in the replacement string.
-func (r *Regex) ReplaceNFunc(text string, replacement func(capture *Captures) string, limit int) string {
+func (r *Regex) ReplaceNFunc(text string, replacement ReplacementFunc, limit int) (string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.replacen
-	panic("not implemented")
+	newText := ""
+	captures, err := r.AllCaptures(text)
+	if err != nil {
+		return "", err
+	}
+	lastMatch := 0
+	for i, capture := range captures {
+		if limit > 0 && i >= limit {
+			break
+		}
+		pos := capture.Pos(0)
+		if pos == nil {
+			continue
+		}
+		newText += text[lastMatch:pos.From]
+		newText += replacement(&capture)
+		lastMatch = pos.To
+	}
+	newText += text[lastMatch:]
+	return newText, nil
 }
 
 // SearchWithParam searches pattern in string with match param

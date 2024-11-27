@@ -2,6 +2,7 @@ package onig
 
 import (
 	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
 )
 
@@ -137,4 +138,64 @@ func TestRegex_FindMatches_ZeroLengthMatchesJumpsPastMatchLocation(t *testing.T)
 		NewRange(5, 5),
 		NewRange(11, 11),
 	}, matches)
+}
+
+func TestRegex_Replace(t *testing.T) {
+	regex, err := NewRegex(`\d+`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	replaced, err := regex.Replace("a12b2", "X")
+	assert.NoError(t, err)
+	assert.Equal(t, "aXb2", replaced)
+}
+
+func TestRegex_ReplaceAll(t *testing.T) {
+	regex, err := NewRegex(`\d+`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	replaced, err := regex.ReplaceAll("a12b2", "X")
+	assert.NoError(t, err)
+	assert.Equal(t, "aXbX", replaced)
+}
+
+func TestRegex_ReplaceFunc(t *testing.T) {
+	regex, err := NewRegex(`\d+`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	replaced, err := regex.ReplaceFunc("a12b2", func(capture *Captures) string {
+		return "X"
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "aXb2", replaced)
+
+	regex, err = NewRegex(`[a-z]+`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	replaced, err = regex.ReplaceFunc("a12b2", func(capture *Captures) string {
+		pos := capture.Pos(0)
+		return strings.ToUpper(capture.Text[pos.From:pos.To])
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "A12b2", replaced)
+}
+
+func TestRegex_ReplaceAllFunc(t *testing.T) {
+	regex, err := NewRegex(`\d+`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	replaced, err := regex.ReplaceAllFunc("a12b2", func(capture *Captures) string {
+		return "X"
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "aXbX", replaced)
+
+	regex, err = NewRegex(`[a-z]+`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	replaced, err = regex.ReplaceAllFunc("a12b2", func(capture *Captures) string {
+		pos := capture.Pos(0)
+		return strings.ToUpper(capture.Text[pos.From:pos.To])
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "A12B2", replaced)
 }
