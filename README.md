@@ -38,3 +38,7 @@ func main() {
     }
 }
 ```
+
+## Documentation
+
+The API documentation is available at [https://pkg.go.dev/github.com/tmikus/onig-go](https://pkg.go.dev/github.com/tmikus/onig-go).
