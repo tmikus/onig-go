@@ -75,7 +75,8 @@ func NewRegexWithOptions(
 	return instance, nil
 }
 
-// AllCaptures returns a list of all non-overlapping capture groups matched in text. This is operationally the same as find_iter (except it yields information about submatches).
+// AllCaptures returns a list of all non-overlapping capture groups matched in text.
+// This is operationally the same as FindMatches, except it yields information about submatches.
 func (r *Regex) AllCaptures(text string) ([]Captures, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.captures_iter
 	textLength := uint(len(text))
@@ -140,7 +141,8 @@ func (r *Regex) CaptureNames() []string {
 	return names
 }
 
-// Captures returns the capture groups corresponding to the leftmost-first match in text. Capture group 0 always corresponds to the entire match. If no match is found, then None is returned.
+// Captures returns the capture groups corresponding to the leftmost-first match in text.
+// Capture group 0 always corresponds to the entire match. If no match is found, then nil is returned.
 func (r *Regex) Captures(text string) (*Captures, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.captures
 	region := NewRegion()
@@ -158,7 +160,8 @@ func (r *Regex) Captures(text string) (*Captures, error) {
 	}, nil
 }
 
-// FindMatches returns a list containing each non-overlapping match in text, returning the start and end byte indices with respect to text.
+// FindMatches returns a list containing each non-overlapping match in text,
+// returning the start and end byte indices with respect to text.
 func (r *Regex) FindMatches(text string) ([]*Range, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.find_iter
 	textLength := uint(len(text))
@@ -205,42 +208,48 @@ func (r *Regex) FindMatches(text string) ([]*Range, error) {
 	return matches, nil
 }
 
-// Replace replaces the leftmost-first match with the replacement provided. If no match is found, then a copy of the string is returned unchanged.
+// Replace replaces the leftmost-first match with the replacement provided.
+// If no match is found, then a copy of the string is returned unchanged.
 func (r *Regex) Replace(text string, replacement string) (string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.replace
 	return r.ReplaceN(text, replacement, 1)
 }
 
-// ReplaceAll replaces all non-overlapping matches in text with the replacement provided. This is the same as calling replacen with limit set to 0.
-// See the documentation for replace for details on how to access submatches in the replacement string.
+// ReplaceAll replaces all non-overlapping matches in text with the replacement provided.
+// This is the same as calling ReplaceN with limit set to 0.
+// See the documentation for Replace for details on how to access submatches in the replacement string.
 func (r *Regex) ReplaceAll(text string, replacement string) (string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.replace_all
 	return r.ReplaceN(text, replacement, 0)
 }
 
-// ReplaceAllFunc replaces all non-overlapping matches in text with the replacement function provided. This is the same as calling replacen with limit set to 0.
-// See the documentation for replace for details on how to access submatches in the replacement string.
+// ReplaceAllFunc replaces all non-overlapping matches in text with the replacement function provided.
+// This is the same as calling ReplaceNFunc with limit set to 0.
+// See the documentation for Replace for details on how to access submatches in the replacement string.
 func (r *Regex) ReplaceAllFunc(text string, replacement ReplacementFunc) (string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.replace_all
 	return r.ReplaceNFunc(text, replacement, 0)
 }
 
-// ReplaceFunc replaces the leftmost-first match with the replacement provided. The replacement is a function that takes the matches Captures and returns the replaced string.
+// ReplaceFunc replaces the leftmost-first match with the replacement provided.
+// The replacement is a function that takes the matches Captures and returns the replaced string.
 // If no match is found, then a copy of the string is returned unchanged.
 func (r *Regex) ReplaceFunc(text string, replacement ReplacementFunc) (string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.replace
 	return r.ReplaceNFunc(text, replacement, 1)
 }
 
-// ReplaceN replaces at most limit non-overlapping matches in text with the replacement provided. If limit is 0, then all non-overlapping matches are replaced.
-// See the documentation for replace for details on how to access submatches in the replacement string.
+// ReplaceN replaces at most limit non-overlapping matches in text with the replacement provided.
+// If limit is 0, then all non-overlapping matches are replaced.
+// See the documentation for Replace for details on how to access submatches in the replacement string.
 func (r *Regex) ReplaceN(text string, replacement string, limit int) (string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.replacen
 	return r.ReplaceNFunc(text, func(_ *Captures) string { return replacement }, limit)
 }
 
-// ReplaceNFunc replaces at most limit non-overlapping matches in text with the replacement provided. If limit is 0, then all non-overlapping matches are replaced.
-// See the documentation for replace for details on how to access submatches in the replacement string.
+// ReplaceNFunc replaces at most limit non-overlapping matches in text with the replacement provided.
+// If limit is 0, then all non-overlapping matches are replaced.
+// See the documentation for Replace for details on how to access submatches in the replacement string.
 func (r *Regex) ReplaceNFunc(text string, replacement ReplacementFunc, limit int) (string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.replacen
 	newText := ""
@@ -265,7 +274,7 @@ func (r *Regex) ReplaceNFunc(text string, replacement ReplacementFunc, limit int
 	return newText, nil
 }
 
-// SearchWithParam searches pattern in string with match param
+// SearchWithParam searches pattern in string with match param.
 //
 // Search for matches the regex in a string. This method will return the index of the first match of the regex within the string,
 // if there is one. If from is less than to, then search is performed in forward order, otherwise – in backward order.
@@ -318,7 +327,8 @@ func (r *Regex) SearchWithParam(
 	return nil, errorFromCode(result)
 }
 
-// Split returns a list of substrings of text delimited by a match of the regular expression. Namely, each element of the iterator corresponds to text that isn’t matched by the regular expression.
+// Split returns a list of substrings of text delimited by a match of the regular expression.
+// Namely, each element of the iterator corresponds to text that isn’t matched by the regular expression.
 func (r *Regex) Split(text string) ([]string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.split
 	matches, err := r.FindMatches(text)
@@ -338,7 +348,10 @@ func (r *Regex) Split(text string) ([]string, error) {
 	return splits, nil
 }
 
-// SplitN returns a list of at most `limit` substrings of text delimited by a match of the regular expression. (A limit of 0 will return no substrings.) Namely, each element of the iterator corresponds to text that isn’t matched by the regular expression. The remainder of the string that is not split will be the last element in the iterator.
+// SplitN returns a list of at most `limit` substrings of text delimited by a match of the regular expression.
+// A limit of 0 will return no substrings.
+// Namely, each element of the iterator corresponds to text that isn’t matched by the regular expression.
+// The remainder of the string that is not split will be the last element in the iterator.
 func (r *Regex) SplitN(text string, limit int) ([]string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.splitn
 	matches, err := r.FindMatches(text)
