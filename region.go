@@ -15,6 +15,10 @@ func NewRegion() *Region {
 	}
 }
 
+func (r *Region) Clear() {
+	C.onig_region_clear(r.raw)
+}
+
 func (r *Region) Len() int {
 	return int(r.raw.num_regs)
 }

@@ -157,9 +157,50 @@ func (r *Regex) Captures(text string) (*Captures, error) {
 }
 
 // FindMatches returns a list containing each non-overlapping match in text, returning the start and end byte indices with respect to text.
-func (r *Regex) FindMatches(text string) []Match {
+func (r *Regex) FindMatches(text string) ([]*Range, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.find_iter
-	panic("not implemented")
+	textLength := uint(len(text))
+	region := NewRegion()
+	lastEnd := uint(0)
+	var lastMatchEnd *uint
+	matches := make([]*Range, 0)
+	for {
+		if lastEnd > textLength {
+			break
+		}
+		region.Clear()
+		_, err := r.SearchWithParam(
+			text,
+			lastEnd,
+			textLength,
+			REGEX_OPTION_NONE,
+			region,
+			NewMatchParam(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		pos := region.Pos(0)
+		if pos == nil {
+			break
+		}
+		// Don't accept empty matches immediately following the last match.
+		// i.e., no infinite loops please.
+		if pos.To == pos.From && lastMatchEnd != nil && *lastMatchEnd == uint(pos.To) {
+			offset := 1
+			if lastEnd < textLength-1 {
+				offset = len(text[lastEnd : lastEnd+1])
+			}
+			lastEnd += uint(offset)
+			continue
+		} else {
+			toUint := uint(pos.To)
+			lastEnd = toUint
+			lastMatchEnd = &toUint
+		}
+		matches = append(matches, pos)
+	}
+	return matches, nil
 }
 
 // Replace replaces the leftmost-first match with the replacement provided. If no match is found, then a copy of the string is returned unchanged.

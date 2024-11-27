@@ -72,3 +72,69 @@ func TestRegex_Captures(t *testing.T) {
 	assert.Equal(t, "ll", captures.At(1))
 	assert.Equal(t, "", captures.At(2))
 }
+
+func TestRegex_FindMatches(t *testing.T) {
+	regex, err := NewRegex(`\d+`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	matches, err := regex.FindMatches("a12b2")
+	assert.NoError(t, err)
+	assert.Equal(t, []*Range{
+		NewRange(1, 3),
+		NewRange(4, 5),
+	}, matches)
+}
+
+func TestRegex_FindMatches_OneZeroLength(t *testing.T) {
+	regex, err := NewRegex(`\d*`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	matches, err := regex.FindMatches("a1b2")
+	assert.NoError(t, err)
+	assert.Equal(t, []*Range{
+		NewRange(0, 0),
+		NewRange(1, 2),
+		NewRange(3, 4),
+	}, matches)
+}
+
+func TestRegex_FindMatches_ManyZeroLength(t *testing.T) {
+	regex, err := NewRegex(`\d*`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	matches, err := regex.FindMatches("a1bbb2")
+	assert.NoError(t, err)
+	assert.Equal(t, []*Range{
+		NewRange(0, 0),
+		NewRange(1, 2),
+		NewRange(3, 3),
+		NewRange(4, 4),
+		NewRange(5, 6),
+	}, matches)
+}
+
+func TestRegex_FindMatches_EmptyAfterMatch(t *testing.T) {
+	regex, err := NewRegex(`b|(?=,)`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	matches, err := regex.FindMatches("ba,")
+	assert.NoError(t, err)
+	assert.Equal(t, []*Range{
+		NewRange(0, 1),
+		NewRange(2, 2),
+	}, matches)
+}
+
+func TestRegex_FindMatches_ZeroLengthMatchesJumpsPastMatchLocation(t *testing.T) {
+	regex, err := NewRegex(`\b`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	matches, err := regex.FindMatches("test string")
+	assert.NoError(t, err)
+	assert.Equal(t, []*Range{
+		NewRange(0, 0),
+		NewRange(4, 4),
+		NewRange(5, 5),
+		NewRange(11, 11),
+	}, matches)
+}
