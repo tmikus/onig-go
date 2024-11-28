@@ -97,54 +97,24 @@ func NewRegexWithOptionsAndSyntax(
 // This is operationally the same as FindMatches, except it yields information about submatches.
 func (r *Regex) AllCaptures(text string) ([]Captures, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.captures_iter
-	textLength := uint(len(text))
-	var lastEnd uint = 0
-	var lastMatchEnd *uint
-	captures := make([]Captures, 0)
-	for {
-		if lastEnd > textLength {
-			break
-		}
-		region := NewRegion()
-		result, err := r.SearchWithParam(
-			text,
-			lastEnd,
-			uint(len(text)),
-			REGEX_OPTION_NONE,
-			region,
-			NewMatchParam(),
-		)
-		if err != nil {
-			return nil, err
-		}
-		if result == nil {
-			break
-		}
-		pos := region.Pos(0)
-		if pos == nil {
-			break
-		}
-		// Don't accept empty matches immediately following the last match.
-		// i.e., no infinite loops please.
-		if pos.To == pos.From && lastMatchEnd != nil && *lastMatchEnd == uint(pos.To) {
-			offset := 1
-			if lastEnd < textLength-1 {
-				offset = len(text[lastEnd : lastEnd+1])
-			}
-			lastEnd += uint(offset)
-			continue
-		} else {
-			toUint := uint(pos.To)
-			lastEnd = toUint
-			lastMatchEnd = &toUint
-		}
-		captures = append(captures, Captures{
-			Offset: *result,
-			Region: region,
-			Text:   text,
-		})
+	iterator := r.AllCapturesIter(text)
+	result := make([]Captures, 0)
+	for captures := range iterator.All() {
+		result = append(result, *captures)
 	}
-	return captures, nil
+	if iterator.Err() != nil {
+		return nil, iterator.Err()
+	}
+	return result, nil
+}
+
+// AllCapturesIter returns an iterator of all non-overlapping capture groups matched in text.
+// This is operationally the same as FindMatches, except it yields information about submatches.
+func (r *Regex) AllCapturesIter(text string) *CapturesIterator {
+	return &CapturesIterator{
+		r:    r,
+		text: text,
+	}
 }
 
 // CaptureNames returns a list of the names of all capture groups in the regular expression.
@@ -182,48 +152,25 @@ func (r *Regex) Captures(text string) (*Captures, error) {
 // returning the start and end byte indices with respect to text.
 func (r *Regex) FindMatches(text string) ([]*Range, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.find_iter
-	textLength := uint(len(text))
-	region := NewRegion()
-	lastEnd := uint(0)
-	var lastMatchEnd *uint
-	matches := make([]*Range, 0)
-	for {
-		if lastEnd > textLength {
-			break
-		}
-		region.Clear()
-		_, err := r.SearchWithParam(
-			text,
-			lastEnd,
-			textLength,
-			REGEX_OPTION_NONE,
-			region,
-			NewMatchParam(),
-		)
-		if err != nil {
-			return nil, err
-		}
-		pos := region.Pos(0)
-		if pos == nil {
-			break
-		}
-		// Don't accept empty matches immediately following the last match.
-		// i.e., no infinite loops please.
-		if pos.To == pos.From && lastMatchEnd != nil && *lastMatchEnd == uint(pos.To) {
-			offset := 1
-			if lastEnd < textLength-1 {
-				offset = len(text[lastEnd : lastEnd+1])
-			}
-			lastEnd += uint(offset)
-			continue
-		} else {
-			toUint := uint(pos.To)
-			lastEnd = toUint
-			lastMatchEnd = &toUint
-		}
-		matches = append(matches, pos)
+	iterator := r.FindMatchesIter(text)
+	result := make([]*Range, 0)
+	for match := range iterator.All() {
+		result = append(result, match)
 	}
-	return matches, nil
+	if iterator.Err() != nil {
+		return nil, iterator.Err()
+	}
+	return result, nil
+}
+
+// FindMatchesIter returns an iterator containing each non-overlapping match in text,
+// returning the start and end byte indices with respect to text.
+func (r *Regex) FindMatchesIter(text string) *FindMatchesIterator {
+	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.find_iter
+	return &FindMatchesIterator{
+		r:    r,
+		text: text,
+	}
 }
 
 // MustAllCaptures returns a list of all non-overlapping capture groups matched in text.

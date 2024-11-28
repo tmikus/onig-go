@@ -2,6 +2,7 @@ package onig
 
 import (
 	"github.com/stretchr/testify/assert"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -18,6 +19,16 @@ func TestRegex_AllCaptures(t *testing.T) {
 	assert.NotNil(t, regex)
 	captures, err := regex.AllCaptures("a12b2")
 	assert.NoError(t, err)
+	assert.Len(t, captures, 2)
+	assert.Equal(t, NewRange(1, 3), captures[0].Pos(0))
+	assert.Equal(t, NewRange(4, 5), captures[1].Pos(0))
+}
+
+func TestRegex_AllCapturesIter(t *testing.T) {
+	regex, err := NewRegex(`\d+`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	captures := slices.Collect(regex.AllCapturesIter("a12b2").All())
 	assert.Len(t, captures, 2)
 	assert.Equal(t, NewRange(1, 3), captures[0].Pos(0))
 	assert.Equal(t, NewRange(4, 5), captures[1].Pos(0))
@@ -72,6 +83,7 @@ func TestRegex_Captures(t *testing.T) {
 	assert.Equal(t, "ell", captures.At(0))
 	assert.Equal(t, "ll", captures.At(1))
 	assert.Equal(t, "", captures.At(2))
+	assert.Equal(t, []string{"ell", "ll", ""}, slices.Collect(captures.All()))
 }
 
 func TestRegex_FindMatches(t *testing.T) {
@@ -137,6 +149,17 @@ func TestRegex_FindMatches_ZeroLengthMatchesJumpsPastMatchLocation(t *testing.T)
 		NewRange(4, 4),
 		NewRange(5, 5),
 		NewRange(11, 11),
+	}, matches)
+}
+
+func TestRegex_FindMatchesIter(t *testing.T) {
+	regex, err := NewRegex(`\d+`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	matches := slices.Collect(regex.FindMatchesIter("a12b2").All())
+	assert.Equal(t, []*Range{
+		NewRange(1, 3),
+		NewRange(4, 5),
 	}, matches)
 }
 

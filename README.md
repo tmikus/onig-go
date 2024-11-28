@@ -41,11 +41,13 @@ import (
 func main() {
     regex, _ := onig.NewRegex("e(l+)")
     captures, _ := regex.Captures("hello")
-    for _, text := range captures.All() {
+    for text := range captures.All() {
         fmt.Println(text)
     }
 }
 ```
+
+For more examples, see the [regex_test.go](https://github.com/tmikus/onig-go/blob/main/regex_test.go) file.
 
 ## Documentation
 
