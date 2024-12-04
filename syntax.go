@@ -68,7 +68,8 @@ var SyntaxPerlNG = &Syntax{
 
 // SyntaxRuby is the Ruby regular expression syntax.
 var SyntaxRuby = &Syntax{
-	raw: C.ONIG_SYNTAX_RUBY,
+	ReplacerFactory: NewRubyRegexReplacer,
+	raw:             C.ONIG_SYNTAX_RUBY,
 }
 
 // SyntaxOniguruma is the Oniguruma regular expression syntax.
@@ -78,5 +79,6 @@ var SyntaxOniguruma = &Syntax{
 
 // SyntaxDefault is the default syntax (Ruby syntax).
 var SyntaxDefault = &Syntax{
-	raw: C.ONIG_SYNTAX_DEFAULT,
+	ReplacerFactory: NewRubyRegexReplacer,
+	raw:             C.ONIG_SYNTAX_RUBY,
 }
