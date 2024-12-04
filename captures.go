@@ -1,6 +1,8 @@
 package onig
 
-import "iter"
+import (
+	"iter"
+)
 
 // Captures represents a group of captured strings for a single match.
 //
@@ -9,6 +11,7 @@ import "iter"
 // Positions returned from a capture group are always byte indices.
 type Captures struct {
 	Offset uint
+	Regex  *Regex
 	Region *Region
 	Text   string
 }
@@ -60,9 +63,19 @@ func (c *Captures) AllPosWithIndex() iter.Seq2[int, *Range] {
 }
 
 // At returns the matched string for the capture group i.
-// If it isn’t a valid capture group or didn’t match anything, then an empty string is returned.
+// If it isn’t a valid capture group or didn’t match anything, then an empty string is returned
 func (c *Captures) At(i int) string {
 	r := c.Pos(i)
+	if r == nil {
+		return ""
+	}
+	return c.Text[r.From:r.To]
+}
+
+// AtGroupName returns the matched string for the named capture group.
+// If it isn’t a valid capture group or didn’t match anything, then an empty string is returned
+func (c *Captures) AtGroupName(groupName string) string {
+	r := c.PosByGroupName(groupName)
 	if r == nil {
 		return ""
 	}
@@ -84,4 +97,11 @@ func (c *Captures) Len() int {
 // The positions returned are always byte indices with respect to the original string matched.
 func (c *Captures) Pos(i int) *Range {
 	return c.Region.Pos(i)
+}
+
+// PosByGroupName returns the start and end positions of the named capture group.
+// Returns nil if the capture group did not match anything or if groupName is not a valid capture group.
+// The positions returned are always byte indices with respect to the original string matched.
+func (c *Captures) PosByGroupName(groupName string) *Range {
+	return c.Region.PosByGroupName(groupName)
 }

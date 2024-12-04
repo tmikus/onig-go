@@ -11,12 +11,14 @@ import "C"
 // This type allows interaction with the built-in syntaxes through the static accessor functions
 // (Syntax::emacs(), Syntax::default() etc.) and the creation of custom syntaxes.
 type Syntax struct {
-	raw *C.OnigSyntaxType
+	ReplacerFactory RegexReplacerFactory
+	raw             *C.OnigSyntaxType
 }
 
 // SyntaxPython is the Python syntax.
 var SyntaxPython = &Syntax{
-	raw: C.ONIG_SYNTAX_PYTHON,
+	ReplacerFactory: NewPythonRegexReplacer,
+	raw:             C.ONIG_SYNTAX_PYTHON,
 }
 
 // SyntaxAsis is the plain text syntax.

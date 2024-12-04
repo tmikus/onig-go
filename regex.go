@@ -31,12 +31,50 @@ func goOnigForeachNameCallback(
 }
 
 // ReplacementFunc is a function that takes the matches Captures and returns the replaced string.
-type ReplacementFunc func(capture *Captures) string
+type ReplacementFunc func(capture *Captures) (string, error)
 
 // Regex represents a regular expression.
 // It is a wrapper around the Oniguruma regex library.
 type Regex struct {
-	raw C.OnigRegex
+	captureNames []string
+	raw          C.OnigRegex
+	syntax       *Syntax
+}
+
+// MustNewRegex creates a new Regex object.
+func MustNewRegex(pattern string) *Regex {
+	regex, err := NewRegex(pattern)
+	if err != nil {
+		panic(err)
+	}
+	return regex
+}
+
+// MustNewRegexWithOptions creates a new Regex object with the given options.
+func MustNewRegexWithOptions(pattern string, options RegexOptions) *Regex {
+	regex, err := NewRegexWithOptions(pattern, options)
+	if err != nil {
+		panic(err)
+	}
+	return regex
+}
+
+// MustNewRegexWithSyntax creates a new Regex object with the given syntax.
+func MustNewRegexWithSyntax(pattern string, syntax *Syntax) *Regex {
+	regex, err := NewRegexWithSyntax(pattern, syntax)
+	if err != nil {
+		panic(err)
+	}
+	return regex
+}
+
+// MustNewRegexWithOptionsAndSyntax creates a new Regex object with the given options and syntax.
+func MustNewRegexWithOptionsAndSyntax(pattern string, options RegexOptions, syntax *Syntax) *Regex {
+	regex, err := NewRegexWithOptionsAndSyntax(pattern, options, syntax)
+	if err != nil {
+		panic(err)
+	}
+	return regex
 }
 
 // NewRegex creates a new Regex object.
@@ -65,7 +103,8 @@ func NewRegexWithOptionsAndSyntax(
 ) (*Regex, error) {
 	var onigRegex C.OnigRegex
 	instance := &Regex{
-		raw: onigRegex,
+		raw:    onigRegex,
+		syntax: syntax,
 	}
 	runtime.SetFinalizer(instance, func(regex *Regex) {
 		if regex.raw != nil {
@@ -121,12 +160,15 @@ func (r *Regex) AllCapturesIter(text string) *CapturesIterator {
 func (r *Regex) CaptureNames() []string {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.foreach_name
 	// and https://docs.rs/onig/latest/onig/struct.Regex.html#method.capture_names_len
-	var names []string
-	C.callOnigForeachName(
-		r.raw,
-		unsafe.Pointer(&names),
-	)
-	return names
+	if r.captureNames == nil {
+		var names []string
+		C.callOnigForeachName(
+			r.raw,
+			unsafe.Pointer(&names),
+		)
+		r.captureNames = names
+	}
+	return r.captureNames
 }
 
 // Captures returns the capture groups corresponding to the leftmost-first match in text.
@@ -143,6 +185,7 @@ func (r *Regex) Captures(text string) (*Captures, error) {
 	}
 	return &Captures{
 		Offset: *match,
+		Regex:  r,
 		Region: region,
 		Text:   text,
 	}, nil
@@ -361,7 +404,16 @@ func (r *Regex) ReplaceFunc(text string, replacement ReplacementFunc) (string, e
 // See the documentation for Replace for details on how to access submatches in the replacement string.
 func (r *Regex) ReplaceN(text string, replacement string, limit int) (string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.replacen
-	return r.ReplaceNFunc(text, func(_ *Captures) string { return replacement }, limit)
+	var replacementFunc ReplacementFunc
+	if r.syntax != nil && r.syntax.ReplacerFactory != nil {
+		replacementFunc = r.syntax.ReplacerFactory(replacement).Replace
+	}
+	if replacementFunc == nil {
+		replacementFunc = func(captures *Captures) (string, error) {
+			return replacement, nil
+		}
+	}
+	return r.ReplaceNFunc(text, replacementFunc, limit)
 }
 
 // ReplaceNFunc replaces at most limit non-overlapping matches in text with the replacement provided.
@@ -384,7 +436,11 @@ func (r *Regex) ReplaceNFunc(text string, replacement ReplacementFunc, limit int
 			continue
 		}
 		newText += text[lastMatch:pos.From]
-		newText += replacement(&capture)
+		replacedText, err := replacement(&capture)
+		if err != nil {
+			return "", fmt.Errorf("error replacing text: %w", err)
+		}
+		newText += replacedText
 		lastMatch = pos.To
 	}
 	newText += text[lastMatch:]
@@ -408,6 +464,7 @@ func (r *Regex) SearchWithParam(
 	matchParam *MatchParam,
 ) (*uint, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.search_with_param
+	region.regex = r
 	cText := C.CString(text)
 	defer C.free(unsafe.Pointer(cText))
 	begin := getUChar(cText)

@@ -4,10 +4,14 @@ package onig
 #include <oniguruma.h>
 */
 import "C"
+import (
+	"slices"
+)
 
 // Region represents a set of capture groups found in a search or match.
 type Region struct {
-	raw *C.OnigRegion
+	raw   *C.OnigRegion
+	regex *Regex
 }
 
 // NewRegion creates a new empty Region.
@@ -28,7 +32,7 @@ func (r *Region) Len() int {
 }
 
 // Pos returns the start and end positions of the Nth capture group.
-// Returns nil if index is not a valid capture group or if the capture group did not match anything.
+// Returns nil if the capture group did not match anything or if index is not a valid capture group.
 // The positions returned are always byte indices with respect to the original string matched.
 func (r *Region) Pos(index int) *Range {
 	if index >= r.Len() {
@@ -36,6 +40,26 @@ func (r *Region) Pos(index int) *Range {
 	}
 	begin := offsetInt(r.raw.beg, index)
 	end := offsetInt(r.raw.end, index)
+	if begin == C.ONIG_REGION_NOTPOS {
+		return nil
+	}
+	return NewRange(int(begin), int(end))
+}
+
+// PosByGroupName returns the start and end positions of the named capture group.
+// Returns nil if the capture group did not match anything or if groupName is not a valid capture group.
+// The positions returned are always byte indices with respect to the original string matched.
+func (r *Region) PosByGroupName(groupName string) *Range {
+	groupNames := r.regex.CaptureNames()
+	groupIndex := slices.Index(groupNames, groupName)
+	if groupIndex == -1 {
+		return nil
+	}
+	if groupIndex >= r.Len() {
+		return nil
+	}
+	begin := offsetInt(r.raw.beg, groupIndex+1)
+	end := offsetInt(r.raw.end, groupIndex+1)
 	if begin == C.ONIG_REGION_NOTPOS {
 		return nil
 	}
