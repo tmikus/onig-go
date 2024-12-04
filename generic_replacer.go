@@ -60,7 +60,9 @@ func (r *GenericRegexReplacer) Replace(captures *Captures) (string, error) {
 			index++
 		} else if inEscapeMode {
 			newReplacement = append(newReplacement, '\\')
-			newReplacement = append(newReplacement, ch)
+			if ch != byte('\\') {
+				newReplacement = append(newReplacement, ch)
+			}
 		} else if ch != byte('\\') {
 			newReplacement = append(newReplacement, ch)
 		}
