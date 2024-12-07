@@ -53,7 +53,8 @@ var SyntaxGnuRegex = &Syntax{
 
 // SyntaxJava is the Java (Sun java.util.regex) regular expression syntax.
 var SyntaxJava = &Syntax{
-	raw: C.ONIG_SYNTAX_JAVA,
+	ReplacerFactory: NewJavaRegexReplacer,
+	raw:             C.ONIG_SYNTAX_JAVA,
 }
 
 // SyntaxPerl is the Perl regular expression syntax.

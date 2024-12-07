@@ -12,9 +12,12 @@ type GenericRegexReplacer struct {
 	replLen          int
 }
 
-// NewGenericRegexReplacer creates a new GenericRegexReplacer given a replacement pattern.
+// NewGenericRegexReplacer creates a new JavaReplacer given a replacement pattern.
 // See https://docs.Generic.org/3/library/re.html#re.sub for more information.
-func NewGenericRegexReplacer(pattern string, namedGroupPrefix byte) RegexReplacer {
+func newGenericRegexReplacer(
+	pattern string,
+	namedGroupPrefix byte,
+) RegexReplacer {
 	repl := []byte(pattern)
 	return &GenericRegexReplacer{
 		namedGroupPrefix: namedGroupPrefix,
