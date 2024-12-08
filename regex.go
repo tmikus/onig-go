@@ -190,6 +190,17 @@ func (r *Regex) Captures(text string) (*Captures, error) {
 	}, nil
 }
 
+// CreateReplacementFunc creates a ReplacementFunc from the given replacement string.
+// The replacement func is created using the syntax's ReplacerFactory if it exists.
+func (r *Regex) CreateReplacementFunc(replacement string) ReplacementFunc {
+	if r.syntax != nil && r.syntax.ReplacerFactory != nil {
+		return r.syntax.ReplacerFactory(replacement).Replace
+	}
+	return func(captures *Captures) (string, error) {
+		return replacement, nil
+	}
+}
+
 // FindMatches returns a list containing each non-overlapping match in text,
 // returning the start and end byte indices with respect to text.
 func (r *Regex) FindMatches(text string) ([]*Range, error) {
@@ -403,16 +414,7 @@ func (r *Regex) ReplaceFunc(text string, replacement ReplacementFunc) (string, e
 // See the documentation for Replace for details on how to access submatches in the replacement string.
 func (r *Regex) ReplaceN(text string, replacement string, limit int) (string, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.replacen
-	var replacementFunc ReplacementFunc
-	if r.syntax != nil && r.syntax.ReplacerFactory != nil {
-		replacementFunc = r.syntax.ReplacerFactory(replacement).Replace
-	}
-	if replacementFunc == nil {
-		replacementFunc = func(captures *Captures) (string, error) {
-			return replacement, nil
-		}
-	}
-	return r.ReplaceNFunc(text, replacementFunc, limit)
+	return r.ReplaceNFunc(text, r.CreateReplacementFunc(replacement), limit)
 }
 
 // ReplaceNFunc replaces at most limit non-overlapping matches in text with the replacement provided.
