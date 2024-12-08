@@ -1,4 +1,4 @@
-module github.com/tmikus/onig-go
+module github.com/tmikus/onig-go/v2
 
 go 1.23.3
 
