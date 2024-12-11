@@ -201,6 +201,20 @@ func (r *Regex) CreateReplacementFunc(replacement string) ReplacementFunc {
 	}
 }
 
+// FindMatch returns the first match of the regex in the given text.
+// If no match is found, then a nil Range is returned.
+func (r *Regex) FindMatch(text string) (*Range, error) {
+	region := NewRegion()
+	match, err := r.SearchWithParam(text, 0, uint(len(text)), REGEX_OPTION_NONE, region, NewMatchParam())
+	if err != nil {
+		return nil, err
+	}
+	if match == nil {
+		return nil, nil
+	}
+	return region.Pos(0), nil
+}
+
 // FindMatches returns a list containing each non-overlapping match in text,
 // returning the start and end byte indices with respect to text.
 func (r *Regex) FindMatches(text string) ([]*Range, error) {
@@ -246,6 +260,17 @@ func (r *Regex) MustCaptures(text string) *Captures {
 		panic(err)
 	}
 	return captures
+}
+
+// MustFindMatch returns the first match of the regex in the given text.
+// If no match is found, then a nil Range is returned.
+// Compared to FindMatch, this method panics on error.
+func (r *Regex) MustFindMatch(text string) *Range {
+	match, err := r.FindMatch(text)
+	if err != nil {
+		panic(err)
+	}
+	return match
 }
 
 // MustFindMatches returns a list containing each non-overlapping match in text,

@@ -86,6 +86,15 @@ func TestRegex_Captures(t *testing.T) {
 	assert.Equal(t, []string{"ell", "ll", ""}, slices.Collect(captures.All()))
 }
 
+func TestRegex_FindMatch(t *testing.T) {
+	regex, err := NewRegex(`\d+`)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	match, err := regex.FindMatch("a12b2")
+	assert.NoError(t, err)
+	assert.Equal(t, NewRange(1, 3), match)
+}
+
 func TestRegex_FindMatches(t *testing.T) {
 	regex, err := NewRegex(`\d+`)
 	assert.NoError(t, err)
