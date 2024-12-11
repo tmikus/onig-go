@@ -25,13 +25,14 @@ func TestRegex_AllCaptures(t *testing.T) {
 }
 
 func TestRegex_AllCapturesIter(t *testing.T) {
-	regex, err := NewRegex(`\d+`)
+	regex, err := NewRegex(`(?<number>\d+)`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	captures := slices.Collect(regex.AllCapturesIter("a12b2").All())
 	assert.Len(t, captures, 2)
 	assert.Equal(t, NewRange(1, 3), captures[0].Pos(0))
 	assert.Equal(t, NewRange(4, 5), captures[1].Pos(0))
+	assert.Equal(t, []string{"number"}, captures[0].Regex.CaptureNames())
 }
 
 func TestRegex_CaptureNames_DefaultSyntax(t *testing.T) {

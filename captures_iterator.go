@@ -67,6 +67,7 @@ func (c *CapturesIterator) AllWithIndex() iter.Seq2[int, *Captures] {
 			}
 			if !yield(index, &Captures{
 				Offset: *result,
+				Regex:  c.r,
 				Region: region,
 				Text:   c.text,
 			}) {
