@@ -4,9 +4,6 @@ package onig
 #include <oniguruma.h>
 */
 import "C"
-import (
-	"slices"
-)
 
 // Region represents a set of capture groups found in a search or match.
 type Region struct {
@@ -50,18 +47,14 @@ func (r *Region) Pos(index int) *Range {
 // Returns nil if the capture group did not match anything or if groupName is not a valid capture group.
 // The positions returned are always byte indices with respect to the original string matched.
 func (r *Region) PosByGroupName(groupName string) *Range {
-	groupNames := r.regex.CaptureNames()
-	groupIndex := slices.Index(groupNames, groupName)
-	if groupIndex == -1 {
-		return nil
+	groupIndices := r.regex.GetGroupNumbersForGroupName(groupName)
+	for _, groupIndex := range groupIndices {
+		begin := offsetInt(r.raw.beg, groupIndex)
+		end := offsetInt(r.raw.end, groupIndex)
+		if begin == C.ONIG_REGION_NOTPOS {
+			continue
+		}
+		return NewRange(int(begin), int(end))
 	}
-	if groupIndex >= r.Len() {
-		return nil
-	}
-	begin := offsetInt(r.raw.beg, groupIndex+1)
-	end := offsetInt(r.raw.end, groupIndex+1)
-	if begin == C.ONIG_REGION_NOTPOS {
-		return nil
-	}
-	return NewRange(int(begin), int(end))
+	return nil
 }

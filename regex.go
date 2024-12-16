@@ -35,9 +35,10 @@ type ReplacementFunc func(capture *Captures) (string, error)
 // Regex represents a regular expression.
 // It is a wrapper around the Oniguruma regex library.
 type Regex struct {
-	captureNames []string
-	raw          C.OnigRegex
-	syntax       *Syntax
+	captureNames    []string
+	groupIndicesMap map[string][]int
+	raw             C.OnigRegex
+	syntax          *Syntax
 }
 
 // MustNewRegex creates a new Regex object.
@@ -102,8 +103,9 @@ func NewRegexWithOptionsAndSyntax(
 ) (*Regex, error) {
 	var onigRegex C.OnigRegex
 	instance := &Regex{
-		raw:    onigRegex,
-		syntax: syntax,
+		groupIndicesMap: map[string][]int{},
+		raw:             onigRegex,
+		syntax:          syntax,
 	}
 	runtime.SetFinalizer(instance, func(regex *Regex) {
 		if regex.raw != nil {
@@ -238,6 +240,35 @@ func (r *Regex) FindMatchesIter(text string) *FindMatchesIterator {
 		r:    r,
 		text: text,
 	}
+}
+
+// GetGroupNumbersForGroupName returns the group numbers for the given group name.
+// Returns nil if the group name is not found.
+func (r *Regex) GetGroupNumbersForGroupName(groupName string) []int {
+	if indices, ok := r.groupIndicesMap[groupName]; ok {
+		return indices
+	}
+	cGroupName := C.CString(groupName)
+	defer C.free(unsafe.Pointer(cGroupName))
+	begin := getUChar(cGroupName)
+	end := getUCharEnd(cGroupName)
+	var nums *C.int
+	groupCount := C.onig_name_to_group_numbers(
+		r.raw,
+		begin,
+		end,
+		&nums,
+	)
+	if groupCount <= 0 {
+		return nil
+	}
+	cNums := (*[1 << 30]C.int)(unsafe.Pointer(nums))[:groupCount:groupCount]
+	result := make([]int, groupCount)
+	for i, num := range cNums {
+		result[i] = int(num)
+	}
+	r.groupIndicesMap[groupName] = result
+	return result
 }
 
 // MustAllCaptures returns a list of all non-overlapping capture groups matched in text.
