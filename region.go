@@ -18,7 +18,7 @@ func NewRegion() *Region {
 		raw: C.onig_region_new(),
 	}
 	runtime.SetFinalizer(region, func(region *Region) {
-		C.onig_region_free(region.raw, 0)
+		C.onig_region_free(region.raw, 1)
 	})
 	return region
 }
