@@ -4,6 +4,7 @@ package onig
 #include <oniguruma.h>
 */
 import "C"
+import "runtime"
 
 // MatchParam contains parameters for a Match or Search.
 type MatchParam struct {
@@ -12,11 +13,14 @@ type MatchParam struct {
 
 // NewMatchParam creates a new MatchParam.
 func NewMatchParam() *MatchParam {
-	raw := C.onig_new_match_param()
-	C.onig_initialize_match_param(raw)
-	return &MatchParam{
-		raw: raw,
+	matchParam := &MatchParam{
+		raw: C.onig_new_match_param(),
 	}
+	C.onig_initialize_match_param(matchParam.raw)
+	runtime.SetFinalizer(matchParam, func(matchParam *MatchParam) {
+		C.onig_free_match_param(matchParam.raw)
+	})
+	return matchParam
 }
 
 // SetMatchStackLimit sets the match stack limit.
