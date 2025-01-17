@@ -10,7 +10,6 @@ import (
 // Each subsequent index corresponds to the next capture group in the regex.
 // Positions returned from a capture group are always byte indices.
 type Captures struct {
-	Offset uint
 	Regex  *Regex
 	Region *Region
 	Text   string
