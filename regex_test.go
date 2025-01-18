@@ -8,13 +8,13 @@ import (
 )
 
 func TestNewRegex(t *testing.T) {
-	regex, err := NewRegex("foo")
+	regex, err := Compile("foo")
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 }
 
 func TestRegex_AllCaptures(t *testing.T) {
-	regex, err := NewRegex(`\d+`)
+	regex, err := Compile(`\d+`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	captures, err := regex.AllCaptures("a12b2")
@@ -24,53 +24,42 @@ func TestRegex_AllCaptures(t *testing.T) {
 	assert.Equal(t, NewRange(4, 5), captures[1].Pos(0))
 }
 
-func TestRegex_AllCapturesIter(t *testing.T) {
-	regex, err := NewRegex(`(?<number>\d+)`)
-	assert.NoError(t, err)
-	assert.NotNil(t, regex)
-	captures := slices.Collect(regex.AllCapturesIter("a12b2").All())
-	assert.Len(t, captures, 2)
-	assert.Equal(t, NewRange(1, 3), captures[0].Pos(0))
-	assert.Equal(t, NewRange(4, 5), captures[1].Pos(0))
-	assert.Equal(t, []string{"number"}, captures[0].Regex.CaptureNames())
-}
-
 func TestRegex_CaptureNames_DefaultSyntax(t *testing.T) {
-	regex, err := NewRegex("(he)(l+)(o)")
+	regex, err := Compile("(he)(l+)(o)")
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	assert.Nil(t, regex.CaptureNames())
 
-	regex, err = NewRegex("(?<foo>foo)")
+	regex, err = Compile("(?<foo>foo)")
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	assert.Equal(t, []string{"foo"}, regex.CaptureNames())
 
-	regex, err = NewRegex("(?<foo>foo)(?<bar>bar)")
+	regex, err = Compile("(?<foo>foo)(?<bar>bar)")
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	assert.Equal(t, []string{"foo", "bar"}, regex.CaptureNames())
 }
 
 func TestRegex_CaptureNames_PythonSyntax(t *testing.T) {
-	regex, err := NewRegexWithSyntax("(he)(l+)(o)", SyntaxPython)
+	regex, err := CompileWithSyntax("(he)(l+)(o)", SyntaxPython)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	assert.Nil(t, regex.CaptureNames())
 
-	regex, err = NewRegexWithSyntax("(?P<foo>foo)", SyntaxPython)
+	regex, err = CompileWithSyntax("(?P<foo>foo)", SyntaxPython)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	assert.Equal(t, []string{"foo"}, regex.CaptureNames())
 
-	regex, err = NewRegexWithSyntax("(?P<foo>foo)(?P<bar>bar)", SyntaxPython)
+	regex, err = CompileWithSyntax("(?P<foo>foo)(?P<bar>bar)", SyntaxPython)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	assert.Equal(t, []string{"foo", "bar"}, regex.CaptureNames())
 }
 
 func TestRegex_Captures(t *testing.T) {
-	regex, err := NewRegex("e(l+)|(r+)")
+	regex, err := Compile("e(l+)|(r+)")
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	captures, err := regex.Captures("hello")
@@ -88,7 +77,7 @@ func TestRegex_Captures(t *testing.T) {
 }
 
 func TestRegex_FindMatch(t *testing.T) {
-	regex, err := NewRegex(`\d+`)
+	regex, err := Compile(`\d+`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	match, err := regex.FindMatch("a12b2")
@@ -97,7 +86,7 @@ func TestRegex_FindMatch(t *testing.T) {
 }
 
 func TestRegex_FindMatches(t *testing.T) {
-	regex, err := NewRegex(`\d+`)
+	regex, err := Compile(`\d+`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	matches, err := regex.FindMatches("a12b2")
@@ -109,7 +98,7 @@ func TestRegex_FindMatches(t *testing.T) {
 }
 
 func TestRegex_FindMatches_OneZeroLength(t *testing.T) {
-	regex, err := NewRegex(`\d*`)
+	regex, err := Compile(`\d*`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	matches, err := regex.FindMatches("a1b2")
@@ -122,7 +111,7 @@ func TestRegex_FindMatches_OneZeroLength(t *testing.T) {
 }
 
 func TestRegex_FindMatches_ManyZeroLength(t *testing.T) {
-	regex, err := NewRegex(`\d*`)
+	regex, err := Compile(`\d*`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	matches, err := regex.FindMatches("a1bbb2")
@@ -137,7 +126,7 @@ func TestRegex_FindMatches_ManyZeroLength(t *testing.T) {
 }
 
 func TestRegex_FindMatches_EmptyAfterMatch(t *testing.T) {
-	regex, err := NewRegex(`b|(?=,)`)
+	regex, err := Compile(`b|(?=,)`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	matches, err := regex.FindMatches("ba,")
@@ -149,7 +138,7 @@ func TestRegex_FindMatches_EmptyAfterMatch(t *testing.T) {
 }
 
 func TestRegex_FindMatches_ZeroLengthMatchesJumpsPastMatchLocation(t *testing.T) {
-	regex, err := NewRegex(`\b`)
+	regex, err := Compile(`\b`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	matches, err := regex.FindMatches("test string")
@@ -162,19 +151,8 @@ func TestRegex_FindMatches_ZeroLengthMatchesJumpsPastMatchLocation(t *testing.T)
 	}, matches)
 }
 
-func TestRegex_FindMatchesIter(t *testing.T) {
-	regex, err := NewRegex(`\d+`)
-	assert.NoError(t, err)
-	assert.NotNil(t, regex)
-	matches := slices.Collect(regex.FindMatchesIter("a12b2").All())
-	assert.Equal(t, []*Range{
-		NewRange(1, 3),
-		NewRange(4, 5),
-	}, matches)
-}
-
 func TestRegex_Replace(t *testing.T) {
-	regex, err := NewRegex(`\d+`)
+	regex, err := Compile(`\d+`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	replaced, err := regex.Replace("a12b2", "X")
@@ -183,7 +161,7 @@ func TestRegex_Replace(t *testing.T) {
 }
 
 func TestRegex_ReplaceAll(t *testing.T) {
-	regex, err := NewRegex(`\d+`)
+	regex, err := Compile(`\d+`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	replaced, err := regex.ReplaceAll("a12b2", "X")
@@ -192,7 +170,7 @@ func TestRegex_ReplaceAll(t *testing.T) {
 }
 
 func TestRegex_ReplaceFunc(t *testing.T) {
-	regex, err := NewRegex(`\d+`)
+	regex, err := Compile(`\d+`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	replaced, err := regex.ReplaceFunc("a12b2", func(capture *Captures) (string, error) {
@@ -201,7 +179,7 @@ func TestRegex_ReplaceFunc(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "aXb2", replaced)
 
-	regex, err = NewRegex(`[a-z]+`)
+	regex, err = Compile(`[a-z]+`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	replaced, err = regex.ReplaceFunc("a12b2", func(capture *Captures) (string, error) {
@@ -213,7 +191,7 @@ func TestRegex_ReplaceFunc(t *testing.T) {
 }
 
 func TestRegex_ReplaceAllFunc(t *testing.T) {
-	regex, err := NewRegex(`\d+`)
+	regex, err := Compile(`\d+`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	replaced, err := regex.ReplaceAllFunc("a12b2", func(capture *Captures) (string, error) {
@@ -222,7 +200,7 @@ func TestRegex_ReplaceAllFunc(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "aXbX", replaced)
 
-	regex, err = NewRegex(`[a-z]+`)
+	regex, err = Compile(`[a-z]+`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	replaced, err = regex.ReplaceAllFunc("a12b2", func(capture *Captures) (string, error) {
@@ -234,7 +212,7 @@ func TestRegex_ReplaceAllFunc(t *testing.T) {
 }
 
 func TestRegex_Split(t *testing.T) {
-	regex, err := NewRegex(`[ \t]+`)
+	regex, err := Compile(`[ \t]+`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	splits, err := regex.Split("a b \t  c\td    e")
@@ -243,7 +221,7 @@ func TestRegex_Split(t *testing.T) {
 }
 
 func TestRegex_SplitN(t *testing.T) {
-	regex, err := NewRegex(`\W+`)
+	regex, err := Compile(`\W+`)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
 	splits, err := regex.SplitN("Hey! How are you?", 3)

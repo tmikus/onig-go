@@ -1,10 +1,10 @@
 package onig
 
 /*
+#cgo CXXFLAGS: -std=c++11
 #cgo LDFLAGS: -L/opt/homebrew/lib -L/usr/local/lib -lonig
 
 #include "regex.h"
-
 */
 import "C"
 import (
@@ -41,62 +41,62 @@ type Regex struct {
 	syntax          *Syntax
 }
 
-// MustNewRegex creates a new Regex object.
-func MustNewRegex(pattern string) *Regex {
-	regex, err := NewRegex(pattern)
+// MustCompile creates a new Regex object.
+func MustCompile(pattern string) *Regex {
+	regex, err := Compile(pattern)
 	if err != nil {
 		panic(err)
 	}
 	return regex
 }
 
-// MustNewRegexWithOptions creates a new Regex object with the given options.
-func MustNewRegexWithOptions(pattern string, options RegexOptions) *Regex {
-	regex, err := NewRegexWithOptions(pattern, options)
+// MustCompileWithOptions creates a new Regex object with the given options.
+func MustCompileWithOptions(pattern string, options RegexOptions) *Regex {
+	regex, err := CompileWithOptions(pattern, options)
 	if err != nil {
 		panic(err)
 	}
 	return regex
 }
 
-// MustNewRegexWithSyntax creates a new Regex object with the given syntax.
-func MustNewRegexWithSyntax(pattern string, syntax *Syntax) *Regex {
-	regex, err := NewRegexWithSyntax(pattern, syntax)
+// MustCompileWithSyntax creates a new Regex object with the given syntax.
+func MustCompileWithSyntax(pattern string, syntax *Syntax) *Regex {
+	regex, err := CompileWithSyntax(pattern, syntax)
 	if err != nil {
 		panic(err)
 	}
 	return regex
 }
 
-// MustNewRegexWithOptionsAndSyntax creates a new Regex object with the given options and syntax.
-func MustNewRegexWithOptionsAndSyntax(pattern string, options RegexOptions, syntax *Syntax) *Regex {
-	regex, err := NewRegexWithOptionsAndSyntax(pattern, options, syntax)
+// MustCompileWithOptionsAndSyntax creates a new Regex object with the given options and syntax.
+func MustCompileWithOptionsAndSyntax(pattern string, options RegexOptions, syntax *Syntax) *Regex {
+	regex, err := CompileWithOptionsAndSyntax(pattern, options, syntax)
 	if err != nil {
 		panic(err)
 	}
 	return regex
 }
 
-// NewRegex creates a new Regex object.
-func NewRegex(pattern string) (*Regex, error) {
-	return NewRegexWithOptionsAndSyntax(pattern, REGEX_OPTION_NONE, SyntaxDefault)
+// Compile creates a new Regex object.
+func Compile(pattern string) (*Regex, error) {
+	return CompileWithOptionsAndSyntax(pattern, REGEX_OPTION_NONE, SyntaxDefault)
 }
 
-// NewRegexWithOptions creates a new Regex object with the given options.
-func NewRegexWithOptions(
+// CompileWithOptions creates a new Regex object with the given options.
+func CompileWithOptions(
 	pattern string,
 	options RegexOptions,
 ) (*Regex, error) {
-	return NewRegexWithOptionsAndSyntax(pattern, options, SyntaxDefault)
+	return CompileWithOptionsAndSyntax(pattern, options, SyntaxDefault)
 }
 
-// NewRegexWithSyntax creates a new Regex object with the given syntax.
-func NewRegexWithSyntax(pattern string, syntax *Syntax) (*Regex, error) {
-	return NewRegexWithOptionsAndSyntax(pattern, REGEX_OPTION_NONE, syntax)
+// CompileWithSyntax creates a new Regex object with the given syntax.
+func CompileWithSyntax(pattern string, syntax *Syntax) (*Regex, error) {
+	return CompileWithOptionsAndSyntax(pattern, REGEX_OPTION_NONE, syntax)
 }
 
-// NewRegexWithOptionsAndSyntax creates a new Regex object with the given options and syntax.
-func NewRegexWithOptionsAndSyntax(
+// CompileWithOptionsAndSyntax creates a new Regex object with the given options and syntax.
+func CompileWithOptionsAndSyntax(
 	pattern string,
 	options RegexOptions,
 	syntax *Syntax,
@@ -137,24 +137,39 @@ func NewRegexWithOptionsAndSyntax(
 // This is operationally the same as FindMatches, except it yields information about submatches.
 func (r *Regex) AllCaptures(text string) ([]Captures, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.captures_iter
-	iterator := r.AllCapturesIter(text)
-	result := make([]Captures, 0)
-	for captures := range iterator.All() {
-		result = append(result, *captures)
+	cText := C.CString(text)
+	result := C.searchAllWithParam(
+		r.raw,
+		cText,
+		C.uint(len(text)),
+		C.uint(0),
+		C.uint(len(text)),
+		C.uint(REGEX_OPTION_NONE),
+		C.uint(0),
+		C.uint(0),
+	)
+	if result.result == C.ONIG_MISMATCH || result.array == nil {
+		return nil, nil
 	}
-	if iterator.Err() != nil {
-		return nil, iterator.Err()
+	if result.result < 0 {
+		return nil, errorFromCode(result.result)
 	}
-	return result, nil
-}
-
-// AllCapturesIter returns an iterator of all non-overlapping capture groups matched in text.
-// This is operationally the same as FindMatches, except it yields information about submatches.
-func (r *Regex) AllCapturesIter(text string) *CapturesIterator {
-	return &CapturesIterator{
-		r:    r,
-		text: text,
+	length := int(result.array.count)
+	regions := make([]*Region, length)
+	rawRegions := (*[1 << 30]*C.region)(unsafe.Pointer(result.array.regions))[:length:length]
+	for i, rawRegion := range rawRegions {
+		regions[i] = newRegion(r, rawRegion)
 	}
+	C.freeRegionsArray(result.array)
+	captures := make([]Captures, len(regions))
+	for i, region := range regions {
+		captures[i] = Captures{
+			Regex:  r,
+			Region: region,
+			Text:   text,
+		}
+	}
+	return captures, nil
 }
 
 // CaptureNames returns a list of the names of all capture groups in the regular expression.
@@ -176,16 +191,21 @@ func (r *Regex) CaptureNames() []string {
 // Capture group 0 always corresponds to the entire match. If no match is found, then nil is returned.
 func (r *Regex) Captures(text string) (*Captures, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.captures
-	region := NewRegion()
-	match, err := r.SearchWithParam(text, 0, uint(len(text)), REGEX_OPTION_NONE, region, NewMatchParam())
+	region, err := r.SearchFirstWithParam(
+		text,
+		0,
+		uint(len(text)),
+		REGEX_OPTION_NONE,
+		0,
+		0,
+	)
 	if err != nil {
 		return nil, err
 	}
-	if match == nil {
+	if region == nil {
 		return nil, nil
 	}
 	return &Captures{
-		Offset: *match,
 		Regex:  r,
 		Region: region,
 		Text:   text,
@@ -206,12 +226,18 @@ func (r *Regex) CreateReplacementFunc(replacement string) ReplacementFunc {
 // FindMatch returns the first match of the regex in the given text.
 // If no match is found, then a nil Range is returned.
 func (r *Regex) FindMatch(text string) (*Range, error) {
-	region := NewRegion()
-	match, err := r.SearchWithParam(text, 0, uint(len(text)), REGEX_OPTION_NONE, region, NewMatchParam())
+	region, err := r.SearchFirstWithParam(
+		text,
+		0,
+		uint(len(text)),
+		REGEX_OPTION_NONE,
+		0,
+		0,
+	)
 	if err != nil {
 		return nil, err
 	}
-	if match == nil {
+	if region == nil {
 		return nil, nil
 	}
 	return region.Pos(0), nil
@@ -221,25 +247,35 @@ func (r *Regex) FindMatch(text string) (*Range, error) {
 // returning the start and end byte indices with respect to text.
 func (r *Regex) FindMatches(text string) ([]*Range, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.find_iter
-	iterator := r.FindMatchesIter(text)
-	result := make([]*Range, 0)
-	for match := range iterator.All() {
-		result = append(result, match)
+	cText := C.CString(text)
+	result := C.searchAllWithParam(
+		r.raw,
+		cText,
+		C.uint(len(text)),
+		C.uint(0),
+		C.uint(len(text)),
+		C.uint(REGEX_OPTION_NONE),
+		C.uint(0),
+		C.uint(0),
+	)
+	if result.result == C.ONIG_MISMATCH || result.array == nil {
+		return nil, nil
 	}
-	if iterator.Err() != nil {
-		return nil, iterator.Err()
+	if result.result < 0 {
+		return nil, errorFromCode(result.result)
 	}
-	return result, nil
-}
-
-// FindMatchesIter returns an iterator containing each non-overlapping match in text,
-// returning the start and end byte indices with respect to text.
-func (r *Regex) FindMatchesIter(text string) *FindMatchesIterator {
-	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.find_iter
-	return &FindMatchesIterator{
-		r:    r,
-		text: text,
+	length := int(result.array.count)
+	regions := make([]*Region, length)
+	rawRegions := (*[1 << 30]*C.region)(unsafe.Pointer(result.array.regions))[:length:length]
+	for i, rawRegion := range rawRegions {
+		regions[i] = newRegion(r, rawRegion)
 	}
+	matches := make([]*Range, len(regions))
+	for i, region := range regions {
+		matches[i] = region.Pos(0)
+	}
+	C.freeRegionsArrayWithRegions(result.array)
+	return matches, nil
 }
 
 // GetGroupNumbersForGroupName returns the group numbers for the given group name.
@@ -386,7 +422,7 @@ func (r *Regex) MustReplaceNFunc(text string, replacement ReplacementFunc, limit
 	return result
 }
 
-// MustSearchWithParam searches pattern in string with match param.
+// MustSearchFirstWithParam searches pattern in string with match param.
 //
 // Search for matches the regex in a string. This method will return the index of the first match of the regex within the string,
 // if there is one. If from is less than to, then search is performed in forward order, otherwise – in backward order.
@@ -395,15 +431,15 @@ func (r *Regex) MustReplaceNFunc(text string, replacement ReplacementFunc, limit
 //
 // The encoding of the buffer passed to search in must match the encoding of the regex.
 // Compared to SearchWithParam, this method panics on error.
-func (r *Regex) MustSearchWithParam(
+func (r *Regex) MustSearchFirstWithParam(
 	text string,
 	from uint,
 	to uint,
 	options RegexOptions,
-	region *Region,
-	matchParam *MatchParam,
-) *uint {
-	result, err := r.SearchWithParam(text, from, to, options, region, matchParam)
+	maxStackSize uint,
+	retryLimitInMatch uint,
+) *Region {
+	result, err := r.SearchFirstWithParam(text, from, to, options, maxStackSize, retryLimitInMatch)
 	if err != nil {
 		panic(err)
 	}
@@ -504,7 +540,7 @@ func (r *Regex) ReplaceNFunc(text string, replacement ReplacementFunc, limit int
 	return newText, nil
 }
 
-// SearchWithParam searches pattern in string with match param.
+// SearchFirstWithParam searches pattern in string with match param.
 //
 // Search for matches the regex in a string. This method will return the index of the first match of the regex within the string,
 // if there is one. If from is less than to, then search is performed in forward order, otherwise – in backward order.
@@ -512,50 +548,32 @@ func (r *Regex) ReplaceNFunc(text string, replacement ReplacementFunc, limit int
 // For more information see [Match vs Search](https://docs.rs/onig/latest/onig/index.html#match-vs-search)
 //
 // The encoding of the buffer passed to search in must match the encoding of the regex.
-func (r *Regex) SearchWithParam(
+func (r *Regex) SearchFirstWithParam(
 	text string,
 	from uint,
 	to uint,
 	options RegexOptions,
-	region *Region,
-	matchParam *MatchParam,
-) (*uint, error) {
-	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.search_with_param
-	region.regex = r
+	maxStackSize uint,
+	retryLimitInMatch uint,
+) (*Region, error) {
 	cText := C.CString(text)
-	defer C.free(unsafe.Pointer(cText))
-	begin := getUChar(cText)
-	end := getUCharEnd(cText)
-	limitStart := offsetUChar(begin, int(from))
-	limitRange := offsetUChar(begin, int(to))
-	if getPointer(limitStart) > getPointer(end) {
-		return nil, fmt.Errorf("start of match must be before end")
-	}
-	if getPointer(limitRange) > getPointer(end) {
-		return nil, fmt.Errorf("limit of match should be before end")
-	}
-	var regionC *C.OnigRegion
-	if region != nil {
-		regionC = region.raw
-	}
-	result := C.onig_search_with_param(
+	result := C.searchFirstWithParam(
 		r.raw,
-		begin,
-		end,
-		limitStart,
-		limitRange,
-		regionC,
+		cText,
+		C.uint(len(text)),
+		C.uint(from),
+		C.uint(to),
 		C.uint(options),
-		matchParam.raw,
+		C.uint(maxStackSize),
+		C.uint(retryLimitInMatch),
 	)
-	if result >= 0 {
-		resultUint := uint(result)
-		return &resultUint, nil
-	}
-	if result == C.ONIG_MISMATCH {
+	if result.result == C.ONIG_MISMATCH {
 		return nil, nil
 	}
-	return nil, errorFromCode(result)
+	if result.result < 0 {
+		return nil, errorFromCode(result.result)
+	}
+	return newRegion(r, result.region), nil
 }
 
 // Split returns a list of substrings of text delimited by a match of the regular expression.
