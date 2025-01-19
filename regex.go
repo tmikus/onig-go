@@ -15,22 +15,6 @@ import (
 	"unsafe"
 )
 
-//export goOnigForeachNameCallback
-func goOnigForeachNameCallback(
-	name *C.UChar,
-	nameEnd *C.UChar,
-	nGroupNum C.int,
-	groupNums *C.int,
-	regex C.OnigRegex,
-	arg unsafe.Pointer,
-) C.int {
-	names := (*[]string)(arg)
-	nameLength := getPointer(nameEnd) - getPointer(name)
-	byteSlice := C.GoBytes(unsafe.Pointer(name), C.int(nameLength))
-	*names = append(*names, string(byteSlice))
-	return 0
-}
-
 // ReplacementFunc is a function that takes the matches Captures and returns the replaced string.
 type ReplacementFunc func(capture *Captures) (string, error)
 
