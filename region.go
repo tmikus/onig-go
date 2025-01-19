@@ -16,16 +16,21 @@ type Region struct {
 
 // newRegion creates a new empty Region.
 func newRegion(regex *Regex, raw *C.region) *Region {
-	region := &Region{
-		raw:   raw,
-		regex: regex,
-	}
+	region := newRawRegion(regex, raw)
 	runtime.SetFinalizer(region, func(region *Region) {
 		if region.raw != nil {
 			C.freeRegion(region.raw)
 			region.raw = nil
 		}
 	})
+	return region
+}
+
+func newRawRegion(regex *Regex, raw *C.region) *Region {
+	region := &Region{
+		raw:   raw,
+		regex: regex,
+	}
 	return region
 }
 

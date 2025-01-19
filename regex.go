@@ -268,7 +268,7 @@ func (r *Regex) FindMatches(text string) ([]*Range, error) {
 	regions := make([]*Region, length)
 	rawRegions := (*[1 << 30]*C.region)(unsafe.Pointer(result.array.regions))[:length:length]
 	for i, rawRegion := range rawRegions {
-		regions[i] = newRegion(r, rawRegion)
+		regions[i] = newRawRegion(r, rawRegion)
 	}
 	matches := make([]*Range, len(regions))
 	for i, region := range regions {
