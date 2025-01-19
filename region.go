@@ -57,6 +57,9 @@ func (r *Region) PosByGroupName(groupName string) *Range {
 	for _, groupIndex := range groupIndices {
 		begin := offsetInt(r.raw.groupStartIndices, groupIndex)
 		end := offsetInt(r.raw.groupEndIndices, groupIndex)
+		if begin == -1 || end == -1 {
+			continue
+		}
 		return NewRange(int(begin), int(end))
 	}
 	return nil
