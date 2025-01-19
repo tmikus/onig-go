@@ -9,7 +9,9 @@ package onig
 import "C"
 import (
 	"fmt"
+	"maps"
 	"runtime"
+	"slices"
 	"unsafe"
 )
 
@@ -35,7 +37,6 @@ type ReplacementFunc func(capture *Captures) (string, error)
 // Regex represents a regular expression.
 // It is a wrapper around the Oniguruma regex library.
 type Regex struct {
-	captureNames    []string
 	groupIndicesMap map[string][]int
 	raw             C.OnigRegex
 	syntax          *Syntax
@@ -101,10 +102,8 @@ func CompileWithOptionsAndSyntax(
 	options RegexOptions,
 	syntax *Syntax,
 ) (*Regex, error) {
-	var onigRegex C.OnigRegex
 	instance := &Regex{
 		groupIndicesMap: map[string][]int{},
-		raw:             onigRegex,
 		syntax:          syntax,
 	}
 	runtime.SetFinalizer(instance, func(regex *Regex) {
@@ -113,23 +112,37 @@ func CompileWithOptionsAndSyntax(
 			regex.raw = nil
 		}
 	})
-	patternCString := C.CString(pattern)
-	patternUString := (*C.UChar)(unsafe.Pointer(patternCString))
-	patternEndUString := (*C.UChar)(unsafe.Pointer(uintptr(unsafe.Pointer(patternUString)) + uintptr(len(pattern))))
-	defer C.free(unsafe.Pointer(patternCString))
-	var onigErrorInfo C.OnigErrorInfo
-	result := C.onig_new(
-		&instance.raw,
-		patternUString,
-		patternEndUString,
+	result := C.newRegex(
+		C.CString(pattern),
+		C.uint(len(pattern)),
 		C.OnigOptionType(options),
-		C.ONIG_ENCODING_UTF8,
 		syntax.raw,
-		&onigErrorInfo,
 	)
-	if result != C.ONIG_NORMAL {
-		return nil, fmt.Errorf("error creating oniguruma regex: onig_new returned %d", int(result))
+	if result.result != C.ONIG_NORMAL {
+		return nil, fmt.Errorf("error creating oniguruma regex: onig_new returned %d", int(result.result))
 	}
+	instance.raw = result.regex
+	if result.groupNames != nil {
+		groupNamesCount := int(result.groupNames.count)
+		if groupNamesCount > 0 && result.groupNames.names != nil {
+			groupNames := (*[1 << 30]C.groupName)(unsafe.Pointer(result.groupNames.names))[:groupNamesCount:groupNamesCount]
+			for _, groupName := range groupNames {
+				if int(groupName.nameLength) == 0 || groupName.name == nil {
+					continue
+				}
+				indicesCount := int(groupName.indicesCount)
+				indices := make([]int, groupName.indicesCount)
+				if indicesCount > 0 && groupName.indices != nil {
+					cIndices := (*[1 << 30]C.int)(unsafe.Pointer(groupName.indices))[:indicesCount:indicesCount]
+					for i, index := range cIndices {
+						indices[i] = int(index)
+					}
+				}
+				instance.groupIndicesMap[C.GoStringN(groupName.name, groupName.nameLength)] = indices
+			}
+		}
+	}
+	C.freeGroupNamesArray(result.groupNames)
 	return instance, nil
 }
 
@@ -172,19 +185,20 @@ func (r *Regex) AllCaptures(text string) ([]Captures, error) {
 	return captures, nil
 }
 
+// CaptureNamesWithIndices returns a map of the names and their indices of all capture groups in the regular expression.
+func (r *Regex) CaptureNamesWithIndices() map[string][]int {
+	result := maps.Clone(r.groupIndicesMap)
+	for name, indices := range result {
+		result[name] = slices.Clone(indices)
+	}
+	return result
+}
+
 // CaptureNames returns a list of the names of all capture groups in the regular expression.
 func (r *Regex) CaptureNames() []string {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.foreach_name
 	// and https://docs.rs/onig/latest/onig/struct.Regex.html#method.capture_names_len
-	if r.captureNames == nil {
-		var names []string
-		C.callOnigForeachName(
-			r.raw,
-			unsafe.Pointer(&names),
-		)
-		r.captureNames = names
-	}
-	return r.captureNames
+	return slices.Sorted(maps.Keys(r.groupIndicesMap))
 }
 
 // Captures returns the capture groups corresponding to the leftmost-first match in text.
@@ -284,27 +298,7 @@ func (r *Regex) GetGroupNumbersForGroupName(groupName string) []int {
 	if indices, ok := r.groupIndicesMap[groupName]; ok {
 		return indices
 	}
-	cGroupName := C.CString(groupName)
-	defer C.free(unsafe.Pointer(cGroupName))
-	begin := getUChar(cGroupName)
-	end := getUCharEnd(cGroupName)
-	var nums *C.int
-	groupCount := C.onig_name_to_group_numbers(
-		r.raw,
-		begin,
-		end,
-		&nums,
-	)
-	if groupCount <= 0 {
-		return nil
-	}
-	cNums := (*[1 << 30]C.int)(unsafe.Pointer(nums))[:groupCount:groupCount]
-	result := make([]int, groupCount)
-	for i, num := range cNums {
-		result[i] = int(num)
-	}
-	r.groupIndicesMap[groupName] = result
-	return result
+	return nil
 }
 
 // MustAllCaptures returns a list of all non-overlapping capture groups matched in text.

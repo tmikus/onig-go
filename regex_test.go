@@ -38,7 +38,7 @@ func TestRegex_CaptureNames_DefaultSyntax(t *testing.T) {
 	regex, err = Compile("(?<foo>foo)(?<bar>bar)")
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
-	assert.Equal(t, []string{"foo", "bar"}, regex.CaptureNames())
+	assert.Equal(t, []string{"bar", "foo"}, regex.CaptureNames())
 }
 
 func TestRegex_CaptureNames_PythonSyntax(t *testing.T) {
@@ -55,7 +55,22 @@ func TestRegex_CaptureNames_PythonSyntax(t *testing.T) {
 	regex, err = CompileWithSyntax("(?P<foo>foo)(?P<bar>bar)", SyntaxPython)
 	assert.NoError(t, err)
 	assert.NotNil(t, regex)
-	assert.Equal(t, []string{"foo", "bar"}, regex.CaptureNames())
+	assert.Equal(t, []string{"bar", "foo"}, regex.CaptureNames())
+
+	regex, err = CompileWithSyntax("(a)(b)(?P<first>sad)\\g<first>(d)(?P<second>asdf)", SyntaxPython)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	assert.Equal(t, []string{"first", "second"}, regex.CaptureNames())
+}
+
+func TestRegex_CaptureNamesWithIndices(t *testing.T) {
+	regex, err := CompileWithSyntax("(a)(b)(?P<first>sad)(\\g<first>)(d)(?P<second>asdf)", SyntaxPython)
+	assert.NoError(t, err)
+	assert.NotNil(t, regex)
+	assert.Equal(t, map[string][]int{
+		"first":  {3},
+		"second": {6},
+	}, regex.CaptureNamesWithIndices())
 }
 
 func TestRegex_Captures(t *testing.T) {

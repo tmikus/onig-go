@@ -1,6 +1,7 @@
 #include "regex.h"
 #include "oniguruma.h"
 #include <cstdlib>
+#include <cstring>
 #include <vector>
 
 class OptionalInt {
@@ -16,7 +17,12 @@ public:
     }
 };
 
-int goOnigForeachNameCallbackWrapper(
+typedef struct {
+    int currentIndex;
+    groupNamesArray* result;
+} appendGroupNameToArrayState;
+
+int appendGroupNameToArray(
 	const UChar* name,
 	const UChar* nameEnd,
 	int nGroupNum,
@@ -24,19 +30,72 @@ int goOnigForeachNameCallbackWrapper(
 	OnigRegex regex,
 	void* arg
 ) {
-    return goOnigForeachNameCallback((UChar*)name, (UChar*)nameEnd, nGroupNum, groupNums, regex, arg);
+    appendGroupNameToArrayState* state = (appendGroupNameToArrayState*)arg;
+    groupName* current = &state->result->names[state->currentIndex];
+    current->nameLength = nameEnd - name;
+    if (current->nameLength > 0) {
+        current->name = (char*)calloc(current->nameLength, sizeof(char));
+        strncpy(current->name, (const char*)name, current->nameLength);
+    } else {
+        current->name = NULL;
+    }
+    current->indicesCount = nGroupNum;
+    if (current->indicesCount > 0) {
+        current->indices = (int*)calloc(current->indicesCount, sizeof(int));
+        memcpy(current->indices, groupNums, current->indicesCount);
+    } else {
+        current->indices = NULL;
+    }
+    state->currentIndex++;
+    return 0;
 }
 
-// Helper function to call onig_foreach_name
-int callOnigForeachName(OnigRegex regex, void* arg) {
-    return onig_foreach_name(regex, goOnigForeachNameCallbackWrapper, arg);
+groupNamesArray* readGroupNames(OnigRegex regex) {
+    groupNamesArray* result = (groupNamesArray*)calloc(1, sizeof(groupNamesArray));
+    result->count = onig_number_of_names(regex);
+    if (result->count > 0) {
+        result->names = (groupName*)calloc(result->count, sizeof(groupName));
+    } else {
+        result->names = NULL;
+    }
+    appendGroupNameToArrayState state;
+    state.currentIndex = 0;
+    state.result = result;
+    onig_foreach_name(regex, appendGroupNameToArray, &state);
+    return result;
+}
+
+newRegexResult newRegex(
+    const char* text,
+    unsigned int textLen,
+    OnigOptionType options,
+    OnigSyntaxType* syntax
+) {
+    newRegexResult result;
+    UChar* patternStart = (UChar*)text;
+    UChar* patternEnd = patternStart + textLen;
+    OnigErrorInfo errorInfo;
+    result.result = onig_new(
+        &result.regex,
+        patternStart,
+        patternEnd,
+        options,
+        ONIG_ENCODING_UTF8,
+        syntax,
+        &errorInfo
+    );
+    if (result.result == ONIG_NORMAL) {
+        result.groupNames = readGroupNames(result.regex);
+    }
+    free((void*)text);
+    return result;
 }
 
 region* regionPtrFromOnigRegion(OnigRegion* onigRegion) {
-    region* result = (region*)malloc(sizeof(region));
+    region* result = (region*)calloc(1, sizeof(region));
     result->groupCount = onigRegion->num_regs;
-    result->groupStartIndices = (int*)malloc(sizeof(int) * result->groupCount);
-    result->groupEndIndices = (int*)malloc(sizeof(int) * result->groupCount);
+    result->groupStartIndices = (int*)calloc(result->groupCount, sizeof(int));
+    result->groupEndIndices = (int*)calloc(result->groupCount, sizeof(int));
     for (int i = 0; i < result->groupCount; i++) {
         result->groupStartIndices[i] = onigRegion->beg[i];
         result->groupEndIndices[i] = onigRegion->end[i];
@@ -86,9 +145,9 @@ searchFirstResult searchFirstWithParam(
 }
 
 regionsArray* regionsArrayFromVector(std::vector<region*>& regions) {
-    regionsArray* result = (regionsArray*)malloc(sizeof(regionsArray));
+    regionsArray* result = (regionsArray*)calloc(1, sizeof(regionsArray));
     result->count = regions.size();
-    result->regions = (region**)malloc(sizeof(region*) * result->count);
+    result->regions = (region**)calloc(result->count, sizeof(region*));
     for (int i = 0; i < result->count; i++) {
         result->regions[i] = regions[i];
     }
@@ -148,11 +207,6 @@ searchAllResult searchAllWithParam(
         // Don't accept empty matches immediately following the last match.
         // i.e., no infinite loops please.
         if (posFrom == posTo && lastMatchEnd.hasValue && lastMatchEnd.value == posTo) {
-            // In Go we used to have all this stuff ... is it relevant to C++?
-            // offset := 1
-            // if lastEnd < textLength-1 {
-            //     offset = len(c.text[lastEnd : lastEnd+1])
-            // }
             lastEnd += 1;
             continue;
         } else {
@@ -177,23 +231,56 @@ searchAllResult searchAllWithParam(
     return result;
 }
 
+void freeGroupNamesArray(groupNamesArray* array) {
+    if (array == NULL) {
+        return;
+    }
+    if (array->names != NULL) {
+        for (int i = 0; i < array->count; i++) {
+            groupName* name = &array->names[i];
+            if (name->indices != NULL) {
+                free(name->indices);
+            }
+            if (name->name != NULL) {
+                free(name->name);
+            }
+        }
+        free(array->names);
+    }
+    free(array);
+}
+
 void freeRegion(region* region) {
+    if (region == NULL) {
+        return;
+    }
     if (region->groupStartIndices != NULL) {
         free(region->groupStartIndices);
     }
     if (region->groupEndIndices != NULL) {
         free(region->groupEndIndices);
     }
+    free(region);
 }
 
 void freeRegionsArray(regionsArray* array) {
-    free(array->regions);
+    if (array == NULL) {
+        return;
+    }
+    if (array->regions != NULL) {
+        free(array->regions);
+    }
     free(array);
 }
 
 void freeRegionsArrayWithRegions(regionsArray* array) {
-    for (int i = 0; i < array->count; i++) {
-        freeRegion(array->regions[i]);
+    if (array == NULL) {
+        return;
+    }
+    if (array->regions != NULL) {
+        for (int i = 0; i < array->count; i++) {
+            freeRegion(array->regions[i]);
+        }
     }
     freeRegionsArray(array);
 }

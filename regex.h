@@ -4,17 +4,30 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-    int goOnigForeachNameCallback(
-    	UChar* name,
-    	UChar* nameEnd,
-    	int nGroupNum,
-    	int* groupNums,
-    	OnigRegex regex,
-    	void* arg
-    );
+    typedef struct {
+        char* name;
+        int nameLength;
+        int* indices;
+        unsigned int indicesCount;
+    } groupName;
 
-    // Helper function to call onig_foreach_name
-    int callOnigForeachName(OnigRegex regex, void* arg);
+    typedef struct {
+        unsigned int count;
+        groupName* names;
+    } groupNamesArray;
+
+    typedef struct {
+        OnigRegex regex;
+        int result;
+        groupNamesArray* groupNames;
+    } newRegexResult;
+
+    newRegexResult newRegex(
+        const char* text,
+        unsigned int textLen,
+        OnigOptionType type,
+        OnigSyntaxType* syntax
+    );
 
     typedef struct {
         int* groupStartIndices;
@@ -59,6 +72,7 @@ extern "C" {
         unsigned int retryLimitInMath
     );
 
+    void freeGroupNamesArray(groupNamesArray* array);
     void freeRegion(region* region);
     void freeRegionsArray(regionsArray* array);
     void freeRegionsArrayWithRegions(regionsArray* array);
