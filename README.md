@@ -35,11 +35,12 @@ package main
 
 import (
     "fmt"
-    "github.com/tmikus/onig-go"
+    "github.com/tmikus/onig-go/v3"
 )
 
 func main() {
     regex, _ := onig.NewRegex("e(l+)")
+    defer regex.Close()
     captures, _ := regex.Captures("hello")
     for text := range captures.All() {
         fmt.Println(text)

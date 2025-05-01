@@ -4,39 +4,34 @@ package onig
 #include "regex.h"
 */
 import "C"
-import (
-	"runtime"
-)
 
 // Region represents a set of capture groups found in a search or match.
 type Region struct {
-	raw   *C.region
-	regex *Regex
+	groupIndicesMap map[string][]int
+	positions       []*Range
 }
 
-// newRegion creates a new empty Region.
+// A newRegion creates a new empty Region.
 func newRegion(regex *Regex, raw *C.region) *Region {
-	region := newRawRegion(regex, raw)
-	runtime.SetFinalizer(region, func(region *Region) {
-		if region.raw != nil {
-			C.freeRegion(region.raw)
-			region.raw = nil
+	positions := make([]*Range, raw.groupCount)
+	for i := 0; i < int(raw.groupCount); i++ {
+		begin := offsetInt(raw.groupStartIndices, i)
+		end := offsetInt(raw.groupEndIndices, i)
+		if begin == -1 || end == -1 {
+			positions[i] = nil
+		} else {
+			positions[i] = NewRange(int(begin), int(end))
 		}
-	})
-	return region
-}
-
-func newRawRegion(regex *Regex, raw *C.region) *Region {
-	region := &Region{
-		raw:   raw,
-		regex: regex,
 	}
-	return region
+	return &Region{
+		groupIndicesMap: regex.groupIndicesMap,
+		positions:       positions,
+	}
 }
 
 // Len returns the number of registers in the region.
 func (r *Region) Len() int {
-	return int(r.raw.groupCount)
+	return len(r.positions)
 }
 
 // Pos returns the start and end positions of the Nth capture group.
@@ -46,26 +41,25 @@ func (r *Region) Pos(index int) *Range {
 	if index >= r.Len() {
 		return nil
 	}
-	begin := offsetInt(r.raw.groupStartIndices, index)
-	end := offsetInt(r.raw.groupEndIndices, index)
-	if begin == -1 || end == -1 {
-		return nil
-	}
-	return NewRange(int(begin), int(end))
+	return r.positions[index]
 }
 
 // PosByGroupName returns the start and end positions of the named capture group.
 // Returns nil if the capture group did not match anything or if groupName is not a valid capture group.
 // The positions returned are always byte indices with respect to the original string matched.
 func (r *Region) PosByGroupName(groupName string) *Range {
-	groupIndices := r.regex.GetGroupNumbersForGroupName(groupName)
-	for _, groupIndex := range groupIndices {
-		begin := offsetInt(r.raw.groupStartIndices, groupIndex)
-		end := offsetInt(r.raw.groupEndIndices, groupIndex)
-		if begin == -1 || end == -1 {
-			continue
+	indices, ok := r.groupIndicesMap[groupName]
+	if !ok {
+		return nil
+	}
+	for _, index := range indices {
+		if index >= r.Len() {
+			return nil
 		}
-		return NewRange(int(begin), int(end))
+		position := r.positions[index]
+		if position != nil {
+			return position
+		}
 	}
 	return nil
 }

@@ -74,7 +74,6 @@ extern "C" {
 
     void freeGroupNamesArray(groupNamesArray* array);
     void freeRegion(region* region);
-    void freeRegionsArray(regionsArray* array);
     void freeRegionsArrayWithRegions(regionsArray* array);
 #ifdef __cplusplus
 }

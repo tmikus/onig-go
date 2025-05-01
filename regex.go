@@ -10,7 +10,6 @@ import "C"
 import (
 	"fmt"
 	"maps"
-	"runtime"
 	"slices"
 	"unsafe"
 )
@@ -90,12 +89,7 @@ func CompileWithOptionsAndSyntax(
 		groupIndicesMap: map[string][]int{},
 		syntax:          syntax,
 	}
-	runtime.SetFinalizer(instance, func(regex *Regex) {
-		if regex.raw != nil {
-			C.onig_free(regex.raw)
-			regex.raw = nil
-		}
-	})
+	// Note: C.CString allocates memory that is freed by the C function newRegex
 	result := C.newRegex(
 		C.CString(pattern),
 		C.uint(len(pattern)),
@@ -103,6 +97,7 @@ func CompileWithOptionsAndSyntax(
 		syntax.raw,
 	)
 	if result.result != C.ONIG_NORMAL {
+		C.freeGroupNamesArray(result.groupNames)
 		return nil, fmt.Errorf("error creating oniguruma regex: onig_new returned %d", int(result.result))
 	}
 	instance.raw = result.regex
@@ -134,6 +129,7 @@ func CompileWithOptionsAndSyntax(
 // This is operationally the same as FindMatches, except it yields information about submatches.
 func (r *Regex) AllCaptures(text string) ([]Captures, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.captures_iter
+	// Note: C.CString allocates memory that is freed by the C function searchAllWithParam
 	cText := C.CString(text)
 	result := C.searchAllWithParam(
 		r.raw,
@@ -149,6 +145,7 @@ func (r *Regex) AllCaptures(text string) ([]Captures, error) {
 		return nil, nil
 	}
 	if result.result < 0 {
+		C.freeRegionsArrayWithRegions(result.array)
 		return nil, errorFromCode(result.result)
 	}
 	length := int(result.array.count)
@@ -157,7 +154,7 @@ func (r *Regex) AllCaptures(text string) ([]Captures, error) {
 	for i, rawRegion := range rawRegions {
 		regions[i] = newRegion(r, rawRegion)
 	}
-	C.freeRegionsArray(result.array)
+	C.freeRegionsArrayWithRegions(result.array)
 	captures := make([]Captures, len(regions))
 	for i, region := range regions {
 		captures[i] = Captures{
@@ -210,6 +207,14 @@ func (r *Regex) Captures(text string) (*Captures, error) {
 	}, nil
 }
 
+// Close releases the resources used by the regex.
+func (r *Regex) Close() {
+	if r.raw != nil {
+		C.onig_free(r.raw)
+		r.raw = nil
+	}
+}
+
 // CreateReplacementFunc creates a ReplacementFunc from the given replacement string.
 // The replacement func is created using the syntax's ReplacerFactory if it exists.
 func (r *Regex) CreateReplacementFunc(replacement string) ReplacementFunc {
@@ -245,6 +250,7 @@ func (r *Regex) FindMatch(text string) (*Range, error) {
 // returning the start and end byte indices with respect to text.
 func (r *Regex) FindMatches(text string) ([]*Range, error) {
 	// Based on https://docs.rs/onig/latest/onig/struct.Regex.html#method.find_iter
+	// Note: C.CString allocates memory that is freed by the C function searchAllWithParam
 	cText := C.CString(text)
 	result := C.searchAllWithParam(
 		r.raw,
@@ -260,13 +266,14 @@ func (r *Regex) FindMatches(text string) ([]*Range, error) {
 		return nil, nil
 	}
 	if result.result < 0 {
+		C.freeRegionsArrayWithRegions(result.array)
 		return nil, errorFromCode(result.result)
 	}
 	length := int(result.array.count)
 	regions := make([]*Region, length)
 	rawRegions := (*[1 << 30]*C.region)(unsafe.Pointer(result.array.regions))[:length:length]
 	for i, rawRegion := range rawRegions {
-		regions[i] = newRawRegion(r, rawRegion)
+		regions[i] = newRegion(r, rawRegion)
 	}
 	matches := make([]*Range, len(regions))
 	for i, region := range regions {
@@ -534,6 +541,7 @@ func (r *Regex) SearchFirstWithParam(
 	maxStackSize uint,
 	retryLimitInMatch uint,
 ) (*Region, error) {
+	// Note: C.CString allocates memory that is freed by the C function searchFirstWithParam
 	cText := C.CString(text)
 	result := C.searchFirstWithParam(
 		r.raw,
@@ -545,13 +553,16 @@ func (r *Regex) SearchFirstWithParam(
 		C.uint(maxStackSize),
 		C.uint(retryLimitInMatch),
 	)
-	if result.result == C.ONIG_MISMATCH {
+	if result.result == C.ONIG_MISMATCH || result.region == nil {
 		return nil, nil
 	}
 	if result.result < 0 {
+		C.freeRegion(result.region)
 		return nil, errorFromCode(result.result)
 	}
-	return newRegion(r, result.region), nil
+	region := newRegion(r, result.region)
+	C.freeRegion(result.region)
+	return region, nil
 }
 
 // Split returns a list of substrings of text delimited by a match of the regular expression.

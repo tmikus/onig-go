@@ -225,7 +225,7 @@ searchAllResult searchAllWithParam(
     result.result = onigSearchResult;
     result.array = regionsArrayFromVector(regions);
     if (onigSearchResult < 0) {
-        freeRegionsArray(result.array);
+        freeRegionsArrayWithRegions(result.array);
         result.array = NULL;
     }
     return result;
@@ -263,16 +263,6 @@ void freeRegion(region* region) {
     free(region);
 }
 
-void freeRegionsArray(regionsArray* array) {
-    if (array == NULL) {
-        return;
-    }
-    if (array->regions != NULL) {
-        free(array->regions);
-    }
-    free(array);
-}
-
 void freeRegionsArrayWithRegions(regionsArray* array) {
     if (array == NULL) {
         return;
@@ -281,6 +271,7 @@ void freeRegionsArrayWithRegions(regionsArray* array) {
         for (int i = 0; i < array->count; i++) {
             freeRegion(array->regions[i]);
         }
+        free(array->regions);
     }
-    freeRegionsArray(array);
+    free(array);
 }
