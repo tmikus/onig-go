@@ -12,7 +12,7 @@ type Region struct {
 }
 
 // A newRegion creates a new empty Region.
-func newRegion(regex *Regex, raw *C.region) *Region {
+func newRegion(regex *Regex, raw C.region) *Region {
 	positions := make([]*Range, raw.groupCount)
 	for i := 0; i < int(raw.groupCount); i++ {
 		begin := offsetInt(raw.groupStartIndices, i)

@@ -96,32 +96,30 @@ func CompileWithOptionsAndSyntax(
 		C.OnigOptionType(options),
 		syntax.raw,
 	)
+	defer C.freeGroupNamesArray(result.groupNames)
 	if result.result != C.ONIG_NORMAL {
-		C.freeGroupNamesArray(result.groupNames)
+		C.onig_free(result.regex)
 		return nil, fmt.Errorf("error creating oniguruma regex: onig_new returned %d", int(result.result))
 	}
 	instance.raw = result.regex
-	if result.groupNames != nil {
-		groupNamesCount := int(result.groupNames.count)
-		if groupNamesCount > 0 && result.groupNames.names != nil {
-			groupNames := (*[1 << 30]C.groupName)(unsafe.Pointer(result.groupNames.names))[:groupNamesCount:groupNamesCount]
-			for _, groupName := range groupNames {
-				if int(groupName.nameLength) == 0 || groupName.name == nil {
-					continue
-				}
-				indicesCount := int(groupName.indicesCount)
-				indices := make([]int, groupName.indicesCount)
-				if indicesCount > 0 && groupName.indices != nil {
-					cIndices := (*[1 << 30]C.int)(unsafe.Pointer(groupName.indices))[:indicesCount:indicesCount]
-					for i, index := range cIndices {
-						indices[i] = int(index)
-					}
-				}
-				instance.groupIndicesMap[C.GoStringN(groupName.name, groupName.nameLength)] = indices
+	groupNamesCount := int(result.groupNames.count)
+	if groupNamesCount > 0 && result.groupNames.names != nil {
+		groupNames := (*[1 << 30]C.groupName)(unsafe.Pointer(result.groupNames.names))[:groupNamesCount:groupNamesCount]
+		for _, groupName := range groupNames {
+			if int(groupName.nameLength) == 0 || groupName.name == nil {
+				continue
 			}
+			indicesCount := int(groupName.indicesCount)
+			indices := make([]int, groupName.indicesCount)
+			if indicesCount > 0 && groupName.indices != nil {
+				cIndices := (*[1 << 30]C.int)(unsafe.Pointer(groupName.indices))[:indicesCount:indicesCount]
+				for i, index := range cIndices {
+					indices[i] = int(index)
+				}
+			}
+			instance.groupIndicesMap[C.GoStringN(groupName.name, groupName.nameLength)] = indices
 		}
 	}
-	C.freeGroupNamesArray(result.groupNames)
 	return instance, nil
 }
 
@@ -141,20 +139,19 @@ func (r *Regex) AllCaptures(text string) ([]Captures, error) {
 		C.uint(0),
 		C.uint(0),
 	)
-	if result.result == C.ONIG_MISMATCH || result.array == nil {
+	defer C.freeRegionsArrayWithRegions(result.array)
+	if result.result == C.ONIG_MISMATCH {
 		return nil, nil
 	}
 	if result.result < 0 {
-		C.freeRegionsArrayWithRegions(result.array)
 		return nil, errorFromCode(result.result)
 	}
 	length := int(result.array.count)
 	regions := make([]*Region, length)
-	rawRegions := (*[1 << 30]*C.region)(unsafe.Pointer(result.array.regions))[:length:length]
+	rawRegions := (*[1 << 30]C.region)(unsafe.Pointer(result.array.regions))[:length:length]
 	for i, rawRegion := range rawRegions {
 		regions[i] = newRegion(r, rawRegion)
 	}
-	C.freeRegionsArrayWithRegions(result.array)
 	captures := make([]Captures, len(regions))
 	for i, region := range regions {
 		captures[i] = Captures{
@@ -262,16 +259,16 @@ func (r *Regex) FindMatches(text string) ([]*Range, error) {
 		C.uint(0),
 		C.uint(0),
 	)
-	if result.result == C.ONIG_MISMATCH || result.array == nil {
+	defer C.freeRegionsArrayWithRegions(result.array)
+	if result.result == C.ONIG_MISMATCH {
 		return nil, nil
 	}
 	if result.result < 0 {
-		C.freeRegionsArrayWithRegions(result.array)
 		return nil, errorFromCode(result.result)
 	}
 	length := int(result.array.count)
 	regions := make([]*Region, length)
-	rawRegions := (*[1 << 30]*C.region)(unsafe.Pointer(result.array.regions))[:length:length]
+	rawRegions := (*[1 << 30]C.region)(unsafe.Pointer(result.array.regions))[:length:length]
 	for i, rawRegion := range rawRegions {
 		regions[i] = newRegion(r, rawRegion)
 	}
@@ -279,7 +276,6 @@ func (r *Regex) FindMatches(text string) ([]*Range, error) {
 	for i, region := range regions {
 		matches[i] = region.Pos(0)
 	}
-	C.freeRegionsArrayWithRegions(result.array)
 	return matches, nil
 }
 
@@ -553,15 +549,14 @@ func (r *Regex) SearchFirstWithParam(
 		C.uint(maxStackSize),
 		C.uint(retryLimitInMatch),
 	)
-	if result.result == C.ONIG_MISMATCH || result.region == nil {
+	defer C.freeRegion(result.region)
+	if result.result == C.ONIG_MISMATCH {
 		return nil, nil
 	}
 	if result.result < 0 {
-		C.freeRegion(result.region)
 		return nil, errorFromCode(result.result)
 	}
 	region := newRegion(r, result.region)
-	C.freeRegion(result.region)
 	return region, nil
 }
 

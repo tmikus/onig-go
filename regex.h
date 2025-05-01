@@ -19,7 +19,7 @@ extern "C" {
     typedef struct {
         OnigRegex regex;
         int result;
-        groupNamesArray* groupNames;
+        groupNamesArray groupNames;
     } newRegexResult;
 
     newRegexResult newRegex(
@@ -37,12 +37,12 @@ extern "C" {
 
     typedef struct {
         unsigned int count;
-        region** regions;
+        region* regions;
     } regionsArray;
 
     typedef struct {
         int result;
-        region* region;
+        region region;
     } searchFirstResult;
 
     searchFirstResult searchFirstWithParam(
@@ -58,7 +58,7 @@ extern "C" {
 
     typedef struct {
         int result;
-        regionsArray* array;
+        regionsArray array;
     } searchAllResult;
 
     searchAllResult searchAllWithParam(
@@ -72,9 +72,9 @@ extern "C" {
         unsigned int retryLimitInMath
     );
 
-    void freeGroupNamesArray(groupNamesArray* array);
-    void freeRegion(region* region);
-    void freeRegionsArrayWithRegions(regionsArray* array);
+    void freeGroupNamesArray(groupNamesArray array);
+    void freeRegion(region region);
+    void freeRegionsArrayWithRegions(regionsArray array);
 #ifdef __cplusplus
 }
 #endif

@@ -50,17 +50,17 @@ int appendGroupNameToArray(
     return 0;
 }
 
-groupNamesArray* readGroupNames(OnigRegex regex) {
-    groupNamesArray* result = (groupNamesArray*)calloc(1, sizeof(groupNamesArray));
-    result->count = onig_number_of_names(regex);
-    if (result->count > 0) {
-        result->names = (groupName*)calloc(result->count, sizeof(groupName));
+groupNamesArray readGroupNames(OnigRegex regex) {
+    groupNamesArray result;
+    result.count = onig_number_of_names(regex);
+    if (result.count > 0) {
+        result.names = (groupName*)calloc(result.count, sizeof(groupName));
     } else {
-        result->names = NULL;
+        result.names = NULL;
     }
     appendGroupNameToArrayState state;
     state.currentIndex = 0;
-    state.result = result;
+    state.result = &result;
     onig_foreach_name(regex, appendGroupNameToArray, &state);
     return result;
 }
@@ -86,19 +86,22 @@ newRegexResult newRegex(
     );
     if (result.result == ONIG_NORMAL) {
         result.groupNames = readGroupNames(result.regex);
+    } else {
+        result.groupNames.names = NULL;
+        result.groupNames.count = 0;
     }
     free((void*)text);
     return result;
 }
 
-region* regionPtrFromOnigRegion(OnigRegion* onigRegion) {
-    region* result = (region*)calloc(1, sizeof(region));
-    result->groupCount = onigRegion->num_regs;
-    result->groupStartIndices = (int*)calloc(result->groupCount, sizeof(int));
-    result->groupEndIndices = (int*)calloc(result->groupCount, sizeof(int));
-    for (int i = 0; i < result->groupCount; i++) {
-        result->groupStartIndices[i] = onigRegion->beg[i];
-        result->groupEndIndices[i] = onigRegion->end[i];
+region regionFromOnigRegion(OnigRegion* onigRegion) {
+    region result;
+    result.groupCount = onigRegion->num_regs;
+    result.groupStartIndices = (int*)calloc(result.groupCount, sizeof(int));
+    result.groupEndIndices = (int*)calloc(result.groupCount, sizeof(int));
+    for (int i = 0; i < result.groupCount; i++) {
+        result.groupStartIndices[i] = onigRegion->beg[i];
+        result.groupEndIndices[i] = onigRegion->end[i];
     }
     return result;
 }
@@ -137,19 +140,19 @@ searchFirstResult searchFirstWithParam(
         option,
         match_param
     );
-    result.region = regionPtrFromOnigRegion(onigRegion);
+    result.region = regionFromOnigRegion(onigRegion);
     onig_region_free(onigRegion, 1);
     onig_free_match_param(match_param);
     free((void*)text);
     return result;
 }
 
-regionsArray* regionsArrayFromVector(std::vector<region*>& regions) {
-    regionsArray* result = (regionsArray*)calloc(1, sizeof(regionsArray));
-    result->count = regions.size();
-    result->regions = (region**)calloc(result->count, sizeof(region*));
-    for (int i = 0; i < result->count; i++) {
-        result->regions[i] = regions[i];
+regionsArray regionsArrayFromVector(std::vector<region>& regions) {
+    regionsArray result;
+    result.count = regions.size();
+    result.regions = (region*)calloc(result.count, sizeof(region));
+    for (int i = 0; i < result.count; i++) {
+        result.regions[i] = regions[i];
     }
     return result;
 }
@@ -164,7 +167,7 @@ searchAllResult searchAllWithParam(
     unsigned int maxStackSize,
     unsigned int retryLimitInMath
 ) {
-    std::vector<region*> regions;
+    std::vector<region> regions;
     OnigMatchParam* match_param = onig_new_match_param();
     onig_initialize_match_param(match_param);
     if (maxStackSize != 0) {
@@ -213,7 +216,7 @@ searchAllResult searchAllWithParam(
             lastEnd = posTo;
             lastMatchEnd.setValue(posTo);
         }
-        regions.push_back(regionPtrFromOnigRegion(onigRegion));
+        regions.push_back(regionFromOnigRegion(onigRegion));
     }
     if (onigSearchResult == ONIG_MISMATCH) {
         onigSearchResult = 0;
@@ -226,18 +229,15 @@ searchAllResult searchAllWithParam(
     result.array = regionsArrayFromVector(regions);
     if (onigSearchResult < 0) {
         freeRegionsArrayWithRegions(result.array);
-        result.array = NULL;
+        result.array.regions = NULL;
     }
     return result;
 }
 
-void freeGroupNamesArray(groupNamesArray* array) {
-    if (array == NULL) {
-        return;
-    }
-    if (array->names != NULL) {
-        for (int i = 0; i < array->count; i++) {
-            groupName* name = &array->names[i];
+void freeGroupNamesArray(groupNamesArray array) {
+    if (array.names != NULL) {
+        for (int i = 0; i < array.count; i++) {
+            groupName* name = &array.names[i];
             if (name->indices != NULL) {
                 free(name->indices);
             }
@@ -245,33 +245,24 @@ void freeGroupNamesArray(groupNamesArray* array) {
                 free(name->name);
             }
         }
-        free(array->names);
+        free(array.names);
     }
-    free(array);
 }
 
-void freeRegion(region* region) {
-    if (region == NULL) {
-        return;
+void freeRegion(region region) {
+    if (region.groupStartIndices != NULL) {
+        free(region.groupStartIndices);
     }
-    if (region->groupStartIndices != NULL) {
-        free(region->groupStartIndices);
+    if (region.groupEndIndices != NULL) {
+        free(region.groupEndIndices);
     }
-    if (region->groupEndIndices != NULL) {
-        free(region->groupEndIndices);
-    }
-    free(region);
 }
 
-void freeRegionsArrayWithRegions(regionsArray* array) {
-    if (array == NULL) {
-        return;
-    }
-    if (array->regions != NULL) {
-        for (int i = 0; i < array->count; i++) {
-            freeRegion(array->regions[i]);
+void freeRegionsArrayWithRegions(regionsArray array) {
+    if (array.regions != NULL) {
+        for (int i = 0; i < array.count; i++) {
+            freeRegion(array.regions[i]);
         }
-        free(array->regions);
+        free(array.regions);
     }
-    free(array);
 }
