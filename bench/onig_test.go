@@ -1,15 +1,17 @@
 package bench
 
 import (
-	"github.com/tmikus/onig-go/v2"
 	"strings"
 	"testing"
+
+	"github.com/tmikus/onig-go/v3"
 )
 
 func BenchmarkOnigLiteral(b *testing.B) {
 	x := strings.Repeat("x", 50) + "y"
 	b.StopTimer()
 	re := onig.MustCompile("y")
+	defer re.Close()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		if re.MustFindMatch(x) == nil {
@@ -22,6 +24,7 @@ func BenchmarkOnigNotLiteral(b *testing.B) {
 	x := strings.Repeat("x", 50) + "y"
 	b.StopTimer()
 	re := onig.MustCompile(".y")
+	defer re.Close()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		if re.MustFindMatch(x) == nil {
@@ -34,6 +37,7 @@ func BenchmarkOnigMatchClass(b *testing.B) {
 	b.StopTimer()
 	x := strings.Repeat("xxxx", 20) + "w"
 	re := onig.MustCompile("[abcdw]")
+	defer re.Close()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		if re.MustFindMatch(x) == nil {
@@ -48,6 +52,7 @@ func BenchmarkOnigMatchClass_InRange(b *testing.B) {
 	// range checking is no help here.
 	x := strings.Repeat("bbbb", 20) + "c"
 	re := onig.MustCompile("[ac]")
+	defer re.Close()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		if re.MustFindMatch(x) == nil {
@@ -60,6 +65,7 @@ func BenchmarkOnigAnchoredLiteralShortNonMatch(b *testing.B) {
 	b.StopTimer()
 	x := []byte("abcdefghijklmnopqrstuvwxyz")
 	re := onig.MustCompile("^zbc(d|e)")
+	defer re.Close()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		re.MustFindMatch(string(x))
@@ -73,6 +79,7 @@ func BenchmarkOnigAnchoredLiteralLongNonMatch(b *testing.B) {
 		x = append(x, x...)
 	}
 	re := onig.MustCompile("^zbc(d|e)")
+	defer re.Close()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		re.MustFindMatch(string(x))
@@ -83,6 +90,7 @@ func BenchmarkOnigAnchoredShortMatch(b *testing.B) {
 	b.StopTimer()
 	x := []byte("abcdefghijklmnopqrstuvwxyz")
 	re := onig.MustCompile("^.bc(d|e)")
+	defer re.Close()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		re.MustFindMatch(string(x))
@@ -96,6 +104,7 @@ func BenchmarkOnigAnchoredLongMatch(b *testing.B) {
 		x = append(x, x...)
 	}
 	re := onig.MustCompile("^.bc(d|e)")
+	defer re.Close()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		re.MustFindMatch(string(x))
@@ -106,6 +115,7 @@ func BenchmarkOnigOnePassShortA(b *testing.B) {
 	b.StopTimer()
 	x := []byte("abcddddddeeeededd")
 	re := onig.MustCompile("^.bc(d|e)*$")
+	defer re.Close()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		re.MustFindMatch(string(x))
@@ -116,6 +126,7 @@ func BenchmarkOnigNotOnePassShortA(b *testing.B) {
 	b.StopTimer()
 	x := []byte("abcddddddeeeededd")
 	re := onig.MustCompile(".bc(d|e)*$")
+	defer re.Close()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		re.MustFindMatch(string(x))
@@ -126,6 +137,7 @@ func BenchmarkOnigOnePassShortB(b *testing.B) {
 	b.StopTimer()
 	x := []byte("abcddddddeeeededd")
 	re := onig.MustCompile("^.bc(?:d|e)*$")
+	defer re.Close()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		re.MustFindMatch(string(x))
@@ -156,6 +168,7 @@ func BenchmarkOnigOnePassLongNotPrefix(b *testing.B) {
 	b.StopTimer()
 	x := []byte("abcdefghijklmnopqrstuvwxyz")
 	re := onig.MustCompile("^.bcdefghijklmnopqrstuvwxyz.*$")
+	defer re.Close()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		re.MustFindMatch(string(x))
@@ -165,6 +178,7 @@ func BenchmarkOnigOnePassLongNotPrefix(b *testing.B) {
 func BenchmarkOnigMatchParallelShared(b *testing.B) {
 	x := []byte("this is a long line that contains foo bar baz")
 	re := onig.MustCompile("foo (ba+r)? baz")
+	defer re.Close()
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -175,6 +189,7 @@ func BenchmarkOnigMatchParallelShared(b *testing.B) {
 
 func benchmarkOnig(b *testing.B, re string, n int) {
 	r := onig.MustCompile(re)
+	defer r.Close()
 	t := makeText(n)
 	b.ResetTimer()
 	b.SetBytes(int64(n))
